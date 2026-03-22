@@ -140,8 +140,17 @@ export const Explore = () => {
               workflows.slice(0, visibleCount).map((workflow, i) => {
                 const isLocked = workflow.price !== 0 && workflow.price !== '0' && !userPlan;
                 return (
-                  <div key={i} onClick={() => isLocked ? navigate('/pricing') : null} className={isLocked ? 'cursor-pointer' : ''}>
-                    <WorkflowCard {...workflow} price={`$${workflow.price}`} isLocked={isLocked} />
+                  <div key={workflow.id || i} onClick={() => isLocked ? navigate('/pricing') : null} className={isLocked ? 'cursor-pointer' : ''}>
+                    <WorkflowCard 
+                      id={workflow.id}
+                      title={workflow.title}
+                      description={workflow.description}
+                      category={workflow.category}
+                      complexity={workflow.complexity}
+                      price={workflow.price}
+                      imageUrl={workflow.imageUrl}
+                      isLocked={isLocked}
+                    />
                   </div>
                 );
               })

@@ -33,6 +33,16 @@ export const Sell = () => {
   };
 
   const publishWorkflow = async () => {
+    // Mandatory field validation
+    if (!title.trim()) {
+      alert('Please enter a workflow title before publishing.');
+      return;
+    }
+    if (!file) {
+      alert('Please upload a workflow file (.json, .yaml, .txt) before publishing.');
+      return;
+    }
+
     try {
       setIsPublishing(true);
       
