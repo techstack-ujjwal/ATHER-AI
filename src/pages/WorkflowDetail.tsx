@@ -134,16 +134,9 @@ export const WorkflowDetail = () => {
                   )}
                 </>
               ) : (
-                <>
-                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={addToCart} className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all duration-300 ${added ? 'bg-green-500 text-white' : 'bg-ink text-surface hover:opacity-90'}`}>
-                    {added ? <><Check className="w-5 h-5" /> Added to Cart!</> : <><ShoppingCart className="w-5 h-5" /> Add to Cart — ${workflow.price}</>}
-                  </motion.button>
-                  {isOwner && workflow.liveUrl && (
-                    <a href={ensureAbsoluteUrl(workflow.liveUrl)} target="_blank" rel="noopener noreferrer" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
-                      <ExternalLink className="w-5 h-5" /> Open Live System (Creator Access)
-                    </a>
-                  )}
-                </>
+                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={addToCart} className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all duration-300 ${added ? 'bg-green-500 text-white' : 'bg-ink text-surface hover:opacity-90'}`}>
+                  {added ? <><Check className="w-5 h-5" /> Added to Cart!</> : <><ShoppingCart className="w-5 h-5" /> Add to Cart — ${workflow.price}</>}
+                </motion.button>
               )}
               {isOwner && (
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={deleteWorkflow} className="w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 bg-red-50 text-red-500 hover:bg-red-100 transition-colors border border-red-100">

@@ -115,11 +115,16 @@ export const Admin = () => {
       // We manually construct the public URL from the project ID
       const publicUrl = `${supabaseUrl}/storage/v1/object/public/workflows/${path}`;
       
-      await fetch(`${supabaseUrl}/rest/v1/CustomBuildRequest?id=eq.${requestId}`, {
+      const patchRes = await fetch(`${supabaseUrl}/rest/v1/CustomBuildRequest?id=eq.${requestId}`, {
         method: 'PATCH',
-        headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
         body: JSON.stringify({ responseFileUrl: publicUrl, status: 'completed' })
       });
+      
+      const patchData = await patchRes.json().catch(() => null);
+      if (!patchRes.ok || !patchData || patchData.length === 0) {
+         throw new Error('Database update failed (Row not found or permission denied by RLS). File was uploaded to storage, but could not link it.');
+      }
 
       setRequests(prev => prev.map(r => r.id === requestId ? { ...r, responseFileUrl: publicUrl, status: 'completed' } : r));
       showToast('File uploaded successfully! Mark as completed.', 'success');
