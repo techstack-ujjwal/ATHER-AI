@@ -109,7 +109,7 @@ export const Pricing = () => {
       }
 
       const amount = parseInt(tier.price.replace('$', ''));
-      const orderResponse = await fetch('http://localhost:3001/api/create-order', {
+      const orderResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount, currency: 'USD' })
@@ -126,7 +126,7 @@ export const Pricing = () => {
         order_id: orderData.id,
         handler: async function (response: any) {
           try {
-            const verifyRes = await fetch('http://localhost:3001/api/verify-payment', {
+            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL}/api/verify-payment`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
