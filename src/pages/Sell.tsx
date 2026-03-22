@@ -56,9 +56,20 @@ export const Sell = () => {
         fileUrl = publicUrl;
       }
 
+      // First, ensure the user exists in the public User table to satisfy the foreign key constraint
+      const { data: existingUser } = await supabase.from('User').select('id').eq('id', session.user.id).maybeSingle();
+      if (!existingUser) {
+        await supabase.from('User').insert({
+          id: session.user.id,
+          email: session.user.email || 'anonymous',
+          name: session.user.user_metadata?.full_name || 'Creator'
+        });
+      }
+
       const { error: dbError } = await supabase
         .from('Workflow')
         .insert({
+          id: crypto.randomUUID(),
           title,
           description,
           category,
