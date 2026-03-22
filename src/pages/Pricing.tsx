@@ -95,25 +95,35 @@ export const Pricing = () => {
     setIsProcessing(true);
     
     try {
+      const apiUrl = import.meta.env.VITE_API_URL;
+      if (!apiUrl) {
+        showToast("Backend API URL (VITE_API_URL) is not configured in environment variables.", "error");
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
-        alert("Please login first to subscribe.");
+        showToast("Please login first to subscribe.", "error");
         navigate('/login');
         return;
       }
 
       const res = await loadRazorpayScript();
       if (!res) {
-        alert('Razorpay SDK failed to load. Are you offline?');
+        showToast('Razorpay SDK failed to load. Are you offline?', "error");
         return;
       }
 
       const amount = parseInt(tier.price.replace('$', ''));
-      const orderResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/create-order`, {
+      const orderResponse = await fetch(`${apiUrl}/api/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount, currency: 'USD' })
       });
+      
+      if (!orderResponse.ok) {
+        throw new Error(`Failed to create order: ${orderResponse.statusText}`);
+      }
       
       const orderData = await orderResponse.json();
 
@@ -126,7 +136,7 @@ export const Pricing = () => {
         order_id: orderData.id,
         handler: async function (response: any) {
           try {
-            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL}/api/verify-payment`, {
+            const verifyRes = await fetch(`${apiUrl}/api/verify-payment`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -169,9 +179,9 @@ export const Pricing = () => {
 
       const paymentObject = new (window as any).Razorpay(options);
       paymentObject.open();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert("Could not initiate payment. Please try again.");
+      showToast(err.message || "Could not initiate payment. Please try again.", "error");
     } finally {
       setIsProcessing(false);
     }

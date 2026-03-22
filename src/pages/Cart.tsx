@@ -31,6 +31,12 @@ export const Cart = () => {
     
     setIsProcessing(true);
     try {
+      const apiUrl = import.meta.env.VITE_API_URL;
+      if (!apiUrl) {
+        showToast("Backend API URL (VITE_API_URL) is not configured.", "error");
+        return;
+      }
+
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         showToast("Please login to proceed with checkout.", "error");
@@ -45,15 +51,20 @@ export const Cart = () => {
       }
 
       // Create order
-      const orderResponse = await fetch(`${import.meta.env.VITE_API_URL}/api/create-order`, {
+      const orderResponse = await fetch(`${apiUrl}/api/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount: total, currency: 'USD' })
       });
+
+      if (!orderResponse.ok) {
+        throw new Error(`Failed to create order: ${orderResponse.statusText}`);
+      }
+
       const orderData = await orderResponse.json();
 
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID,
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
         amount: orderData.amount,
         currency: orderData.currency,
         name: 'AETHER AI',
@@ -61,7 +72,7 @@ export const Cart = () => {
         order_id: orderData.id,
         handler: async function (response: any) {
           try {
-            const verifyRes = await fetch(`${import.meta.env.VITE_API_URL}/api/verify-payment`, {
+            const verifyRes = await fetch(`${apiUrl}/api/verify-payment`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
