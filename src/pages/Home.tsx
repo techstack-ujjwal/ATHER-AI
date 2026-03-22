@@ -15,8 +15,22 @@ export const Home = () => {
     e.preventDefault();
     setCustomStatus("submitting");
     try {
-      const { error } = await supabase.from('CustomBuildRequest').insert([{ email: customEmail, details: customDetails }]);
-      if (error) throw error;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      const res = await fetch(`${supabaseUrl}/rest/v1/CustomBuildRequest`, {
+        method: 'POST',
+        headers: {
+          'apikey': anonKey,
+          'Authorization': `Bearer ${anonKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({ email: customEmail, details: customDetails })
+      });
+      
+      if (!res.ok) throw new Error('Failed to submit custom build request');
+      
       setCustomStatus("success");
       setTimeout(() => {
         setShowCustomModal(false);
@@ -36,27 +50,37 @@ export const Home = () => {
 
   useEffect(() => {
     // Fetch plan
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) setUserPlan(session.user.user_metadata?.plan || null);
-    });
+    const localData = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
+    if (localData) {
+      try {
+        const session = JSON.parse(localData);
+        setUserPlan(session?.user?.user_metadata?.plan || null);
+      } catch (e) {}
+    }
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const headers = { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` };
+
     // Fetch featured workflows
-    supabase
-      .from('Workflow')
-      .select('id, title, category, price, complexity, imageUrl, description')
-      .order('createdAt', { ascending: false })
-      .limit(3)
-      .then(({ data }) => setFeaturedWorkflows(data || []));
+    fetch(`${supabaseUrl}/rest/v1/Workflow?select=id,title,category,price,complexity,imageUrl,description&order=createdAt.desc&limit=3`, { headers })
+      .then(res => res.json())
+      .then(data => setFeaturedWorkflows(data || []))
+      .catch(console.error);
 
     // Fetch stats
     Promise.all([
-      supabase.from('Workflow').select('*', { count: 'exact', head: true }),
-      supabase.from('User').select('*', { count: 'exact', head: true })
-    ]).then(([wf, usr]) => {
+      fetch(`${supabaseUrl}/rest/v1/Workflow?select=*`, { method: 'HEAD', headers: { ...headers, 'Prefer': 'count=exact' } }),
+      fetch(`${supabaseUrl}/rest/v1/User?select=*`, { method: 'HEAD', headers: { ...headers, 'Prefer': 'count=exact' } })
+    ]).then(async ([wfRes, usrRes]) => {
+      // Content-Range header contains the count e.g. "0-9/10"
+      const wfCount = parseInt(wfRes.headers.get('Content-Range')?.split('/')[1] || '10');
+      const usrCount = parseInt(usrRes.headers.get('Content-Range')?.split('/')[1] || '5');
       setStats({
-        workflows: wf.count || 0,
-        users: usr.count || 0
+        workflows: wfCount || 0,
+        users: usrCount || 0
       });
-    });
+    }).catch(console.error);
   }, []);
 
   return (
@@ -99,19 +123,19 @@ export const Home = () => {
           className="flex flex-col md:flex-row gap-4 items-center"
         >
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Link to="/explore" className="bg-ink text-white px-8 py-4 rounded-full font-bold flex items-center gap-2 hover:shadow-xl transition-all duration-300">
+            <Link to="/explore" className="bg-ink text-surface px-8 py-4 rounded-full font-bold flex items-center gap-2 hover:shadow-xl transition-all duration-300">
               Explore Repository <ArrowRight className="w-4 h-4" />
             </Link>
           </motion.div>
           <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-            <Link to="/sell" className="bg-white border border-black/10 px-8 py-4 rounded-full font-bold hover:shadow-xl transition-all duration-300">
+            <Link to="/sell" className="bg-surface border border-ink/20 text-ink px-8 py-4 rounded-full font-bold hover:shadow-xl hover:bg-surface-container-highest transition-all duration-300">
               Become a Seller
             </Link>
           </motion.div>
           <motion.button 
             whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
             onClick={() => setShowCustomModal(true)} 
-            className="bg-surface border border-black/10 text-ink px-8 py-4 rounded-full font-bold hover:shadow-xl hover:bg-white transition-all duration-300 flex items-center gap-2"
+            className="bg-surface border border-ink/20 text-ink px-8 py-4 rounded-full font-bold hover:shadow-xl hover:bg-surface-container-highest transition-all duration-300 flex items-center gap-2"
           >
             Request Custom Build <Zap className="w-4 h-4 text-yellow-500" />
           </motion.button>
@@ -179,19 +203,19 @@ export const Home = () => {
 
       {/* CTA Section */}
       <section className="px-6 md:px-12 py-32">
-        <div className="bg-ink text-white rounded-[3rem] p-12 md:p-24 relative overflow-hidden">
+        <div className="bg-ink text-surface rounded-[3rem] p-12 md:p-24 relative overflow-hidden">
           <div className="relative z-10 max-w-2xl">
             <h2 className="text-4xl md:text-6xl font-black tracking-tighter leading-none mb-8">
               CAN'T FIND WHAT <br /> YOU NEED?
             </h2>
-            <p className="text-white/60 text-lg mb-12">
+            <p className="opacity-70 text-lg mb-12">
               Our custom solutions team can build bespoke AI agents and workflows 
               tailored specifically to your business logic.
             </p>
             <motion.button 
               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
               onClick={() => setShowCustomModal(true)} 
-              className="inline-block bg-white text-ink px-10 py-4 rounded-full font-bold hover:shadow-2xl transition-all duration-300"
+              className="inline-block bg-surface text-ink px-10 py-4 rounded-full font-bold hover:shadow-2xl transition-all duration-300"
             >
               Request Custom Build
             </motion.button>
@@ -199,8 +223,8 @@ export const Home = () => {
           
           {/* Decorative elements */}
           <div className="absolute top-0 right-0 w-1/2 h-full opacity-10 pointer-events-none">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] border border-white rounded-full" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] border border-white rounded-full" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] border border-surface rounded-full" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[700px] h-[700px] border border-surface rounded-full" />
           </div>
         </div>
       </section>
@@ -217,7 +241,7 @@ export const Home = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white max-w-lg w-full rounded-[2rem] p-10 relative shadow-2xl"
+              className="bg-surface max-w-lg w-full rounded-[2rem] p-10 relative shadow-2xl border border-ink/10"
             >
               <button onClick={() => setShowCustomModal(false)} className="absolute top-6 right-6 p-2 rounded-full hover:bg-surface transition-colors">
                 <X className="w-5 h-5" />
@@ -245,7 +269,7 @@ export const Home = () => {
                       value={customEmail}
                       onChange={e => setCustomEmail(e.target.value)}
                       placeholder="hello@company.com" 
-                      className="w-full bg-surface border border-black/10 rounded-xl py-4 px-4 outline-none focus:border-ink transition-colors"
+                      className="w-full bg-surface-container-low border border-ink/20 rounded-xl py-4 px-4 outline-none focus:border-ink transition-colors"
                     />
                   </div>
                   <div className="space-y-2">
@@ -255,13 +279,13 @@ export const Home = () => {
                       value={customDetails}
                       onChange={e => setCustomDetails(e.target.value)}
                       placeholder="Describe the workflow you need built..." 
-                      className="w-full bg-surface border border-black/10 rounded-xl py-4 px-4 outline-none focus:border-ink transition-colors min-h-[120px] resize-none"
+                      className="w-full bg-surface-container-low border border-ink/20 rounded-xl py-4 px-4 outline-none focus:border-ink transition-colors min-h-[120px] resize-none"
                     />
                   </div>
                   <motion.button 
                     whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
                     disabled={customStatus === "submitting"}
-                    className="w-full bg-ink text-white py-4 rounded-xl font-bold hover:shadow-xl transition-all duration-300 disabled:opacity-50"
+                    className="w-full bg-ink text-surface py-4 rounded-xl font-bold hover:shadow-xl transition-all duration-300 disabled:opacity-50"
                   >
                     {customStatus === "submitting" ? "Submitting..." : "Send Request"}
                   </motion.button>

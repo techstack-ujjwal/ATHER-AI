@@ -21,49 +21,106 @@ export const Admin = () => {
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session || session.user.email !== ADMIN_EMAIL) {
+    const checkAdmin = async () => {
+      const localData = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
+      if (!localData) {
         navigate('/');
         return;
       }
-      await loadData();
-      setLoading(false);
-    });
+      try {
+        const session = JSON.parse(localData);
+        if (session?.user?.email !== ADMIN_EMAIL) {
+          navigate('/');
+          return;
+        }
+        await loadData(session.access_token);
+        setLoading(false);
+      } catch (e) {
+        navigate('/');
+      }
+    };
+    checkAdmin();
   }, []);
 
-  const loadData = async () => {
-    const [{ data: wf }, { data: req }, { data: usr }, { data: pur }] = await Promise.all([
-      supabase.from('Workflow').select('*').order('createdAt', { ascending: false }),
-      supabase.from('CustomBuildRequest').select('*').order('createdAt', { ascending: false }),
-      supabase.from('User').select('*').order('createdAt', { ascending: false }),
-      supabase.from('Purchase').select('*, workflow:Workflow(title)').order('createdAt', { ascending: false }),
+  const loadData = async (token: string) => {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const headers = { 'apikey': anonKey, 'Authorization': `Bearer ${token}` };
+
+    const fetchJson = async (url: string) => {
+      const res = await fetch(url, { headers });
+      return res.ok ? await res.json() : [];
+    };
+
+    const [wf, req, usr, pur] = await Promise.all([
+      fetchJson(`${supabaseUrl}/rest/v1/Workflow?select=*&order=createdAt.desc`),
+      fetchJson(`${supabaseUrl}/rest/v1/CustomBuildRequest?select=*&order=createdAt.desc`),
+      fetchJson(`${supabaseUrl}/rest/v1/User?select=*&order=createdAt.desc`),
+      fetchJson(`${supabaseUrl}/rest/v1/Purchase?select=*,workflow:Workflow(title)&order=createdAt.desc`),
     ]);
+
     setWorkflows(wf || []);
     setRequests(req || []);
     setUsers(usr || []);
-    setPurchases(pur || []);
+    // Normalize purchase data due to PostgREST format for relations
+    setPurchases((pur || []).map((p: any) => ({ ...p, workflow: Array.isArray(p.workflow) ? p.workflow[0] : p.workflow })));
+  };
+
+  const getAuthArgs = () => {
+    const localData = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
+    const token = localData ? JSON.parse(localData).access_token : '';
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    return { token, supabaseUrl, anonKey };
   };
 
   const deleteWorkflow = async (id: string) => {
     if (!confirm('Are you sure you want to delete this workflow?')) return;
-    await supabase.from('Workflow').delete().eq('id', id);
+    const { token, supabaseUrl, anonKey } = getAuthArgs();
+    await fetch(`${supabaseUrl}/rest/v1/Workflow?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}` }
+    });
     setWorkflows(prev => prev.filter(w => w.id !== id));
   };
 
   const updateRequestStatus = async (id: string, status: string) => {
-    await supabase.from('CustomBuildRequest').update({ status }).eq('id', id);
+    const { token, supabaseUrl, anonKey } = getAuthArgs();
+    await fetch(`${supabaseUrl}/rest/v1/CustomBuildRequest?id=eq.${id}`, {
+      method: 'PATCH',
+      headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+      body: JSON.stringify({ status })
+    });
     setRequests(prev => prev.map(r => r.id === id ? { ...r, status } : r));
   };
 
   const handleUploadResponse = async (requestId: string, file: File) => {
     setUploadingFor(requestId);
+    const { token, supabaseUrl, anonKey } = getAuthArgs();
     try {
       const ext = file.name.split('.').pop();
       const path = `admin-responses/${requestId}.${ext}`;
-      const { error: uploadError } = await supabase.storage.from('workflows').upload(path, file, { upsert: true });
-      if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from('workflows').getPublicUrl(path);
-      await supabase.from('CustomBuildRequest').update({ responseFileUrl: publicUrl, status: 'completed' }).eq('id', requestId);
+      
+      const uploadRes = await fetch(`${supabaseUrl}/storage/v1/object/workflows/${path}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': file.type || 'application/octet-stream'
+        },
+        body: file
+      });
+      
+      if (!uploadRes.ok) throw new Error('Upload failed');
+      
+      // We manually construct the public URL from the project ID
+      const publicUrl = `${supabaseUrl}/storage/v1/object/public/workflows/${path}`;
+      
+      await fetch(`${supabaseUrl}/rest/v1/CustomBuildRequest?id=eq.${requestId}`, {
+        method: 'PATCH',
+        headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ responseFileUrl: publicUrl, status: 'completed' })
+      });
+
       setRequests(prev => prev.map(r => r.id === requestId ? { ...r, responseFileUrl: publicUrl, status: 'completed' } : r));
       showToast('File uploaded successfully! Mark as completed.', 'success');
     } catch (err: any) {
@@ -73,8 +130,14 @@ export const Admin = () => {
   };
 
   const updateUserPlan = async (userId: string, plan: string) => {
-     const { error } = await supabase.from('User').update({ plan }).eq('id', userId);
-     if (error) {
+     const { token, supabaseUrl, anonKey } = getAuthArgs();
+     const res = await fetch(`${supabaseUrl}/rest/v1/User?id=eq.${userId}`, {
+       method: 'PATCH',
+       headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+       body: JSON.stringify({ plan })
+     });
+     
+     if (!res.ok) {
        showToast("Failed to update plan", "error");
      } else {
        setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan } : u));

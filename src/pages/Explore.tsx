@@ -25,38 +25,60 @@ export const Explore = () => {
     async function fetchWorkflows() {
       setLoading(true);
       try {
-        let query = supabase.from('Workflow').select('*').order('createdAt', { ascending: false });
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+        let queryStr = `${supabaseUrl}/rest/v1/Workflow?select=*&order=createdAt.desc`;
         
         if (activeCategory !== "All") {
-          query = query.eq('category', activeCategory);
+          queryStr += `&category=eq.${encodeURIComponent(activeCategory)}`;
         }
-        
         if (searchQuery) {
-          query = query.ilike('title', `%${searchQuery}%`);
+          queryStr += `&title=ilike.*${encodeURIComponent(searchQuery)}*`;
         }
 
-        const { data, error } = await query;
+        const res = await fetch(queryStr, {
+          headers: { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` }
+        });
         
-        if (error) throw error;
+        if (!res.ok) throw new Error('Failed to fetch workflows');
+        const data = await res.json();
         
-        const mappedData = (data || []).map(w => ({
+        const mappedData = (data || []).map((w: any) => ({
           ...w,
-          // Remove fake mapping that overwrote price and image
           rating: 4.8,
           sales: Math.floor(Math.random() * 100).toString(),
         }));
 
         setWorkflows(mappedData);
+
+        try {
+          const localSessionStr = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
+          if (localSessionStr) {
+            const sessionData = JSON.parse(localSessionStr);
+            const token = sessionData.access_token;
+            const userId = sessionData.user.id;
+            const fallbackPlan = sessionData.user.user_metadata?.plan || 'Free';
+            
+            const userRes = await fetch(`${supabaseUrl}/rest/v1/User?id=eq.${userId}&select=plan`, {
+              headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}` }
+            });
+            if (userRes.ok) {
+              const userData = await userRes.json();
+              if (userData && userData.length > 0) {
+                setUserPlan(userData[0].plan || fallbackPlan);
+              } else {
+                setUserPlan(fallbackPlan);
+              }
+            }
+          }
+        } catch (authErr) {
+          console.warn('Could not parse local auth state', authErr);
+        }
       } catch (err) {
         console.error("Failed to load workflows:", err);
       } finally {
         setLoading(false);
-      }
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-         const { data: userData } = await supabase.from('User').select('plan').eq('id', session.user.id).single();
-         setUserPlan(userData?.plan || session.user.user_metadata?.plan || 'Free');
       }
     }
     

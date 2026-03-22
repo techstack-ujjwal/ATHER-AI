@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import { Trash2, Edit2, X, Check } from 'lucide-react';
+import { Trash2, Edit2, X, Check, ExternalLink } from 'lucide-react';
 
 export const Profile = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<any>(null);
-  const [workflows, setWorkflows] = useState<any[]>([]);
+  const [publishedWorkflows, setPublishedWorkflows] = useState<any[]>([]);
+  const [purchasedWorkflows, setPurchasedWorkflows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingWorkflow, setEditingWorkflow] = useState<any>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -15,19 +16,47 @@ export const Profile = () => {
   const [editPrice, setEditPrice] = useState('');
   const [saving, setSaving] = useState(false);
 
+  const ensureAbsoluteUrl = (url: string) => {
+    if (!url) return '#';
+    return url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
+  };
+
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) { navigate('/login'); return; }
-      setUser(session.user);
-      const { data } = await supabase
-        .from('Workflow')
-        .select('*')
-        .eq('sellerId', session.user.id)
-        .order('createdAt', { ascending: false });
-      setWorkflows(data || []);
-      setLoading(false);
-    });
-  }, []);
+    const fetchProfileData = async () => {
+      const localData = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
+      if (!localData) {
+        navigate('/login');
+        return;
+      }
+      
+      try {
+        const session = JSON.parse(localData);
+        setUser(session.user);
+        
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        const token = session.access_token;
+        const headers = { 'apikey': anonKey, 'Authorization': `Bearer ${token}` };
+
+        // Fetch Published Workflows
+        const pubRes = await fetch(`${supabaseUrl}/rest/v1/Workflow?sellerId=eq.${session.user.id}&order=createdAt.desc&select=*`, { headers });
+        const pubData = await pubRes.json().catch(() => []);
+        setPublishedWorkflows(pubData || []);
+
+        // Fetch Purchased Workflows
+        const purRes = await fetch(`${supabaseUrl}/rest/v1/Purchase?userId=eq.${session.user.id}&select=*,workflow:Workflow(*)`, { headers });
+        const purData = await purRes.json().catch(() => []);
+        setPurchasedWorkflows((purData || []).map((p: any) => p.workflow).filter(Boolean));
+
+      } catch (err) {
+        console.error("Profile fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchProfileData();
+  }, [navigate]);
 
   const openEdit = (wf: any) => {
     setEditingWorkflow(wf);
@@ -39,25 +68,60 @@ export const Profile = () => {
   const saveEdit = async () => {
     if (!editingWorkflow) return;
     setSaving(true);
-    const { error } = await supabase.from('Workflow').update({
-      title: editTitle,
-      description: editDescription,
-      price: parseFloat(editPrice),
-    }).eq('id', editingWorkflow.id);
-    if (!error) {
-      setWorkflows(prev => prev.map(w => w.id === editingWorkflow.id
-        ? { ...w, title: editTitle, description: editDescription, price: parseFloat(editPrice) }
-        : w
-      ));
-      setEditingWorkflow(null);
+    try {
+      const localData = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
+      const token = localData ? JSON.parse(localData).access_token : '';
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const res = await fetch(`${supabaseUrl}/rest/v1/Workflow?id=eq.${editingWorkflow.id}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': anonKey,
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          title: editTitle,
+          description: editDescription,
+          price: parseFloat(editPrice)
+        })
+      });
+
+      if (res.ok) {
+        setPublishedWorkflows(prev => prev.map(w => w.id === editingWorkflow.id
+          ? { ...w, title: editTitle, description: editDescription, price: parseFloat(editPrice) }
+          : w
+        ));
+        setEditingWorkflow(null);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const deleteWorkflow = async (id: string) => {
     if (!confirm('Delete this workflow permanently?')) return;
-    await supabase.from('Workflow').delete().eq('id', id);
-    setWorkflows(prev => prev.filter(w => w.id !== id));
+    try {
+      const localData = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
+      const token = localData ? JSON.parse(localData).access_token : '';
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      const res = await fetch(`${supabaseUrl}/rest/v1/Workflow?id=eq.${id}`, {
+        method: 'DELETE',
+        headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        setPublishedWorkflows(prev => prev.filter(w => w.id !== id));
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   if (loading) return (
@@ -71,7 +135,7 @@ export const Profile = () => {
       <div className="max-w-5xl mx-auto px-6 md:px-12 py-12">
 
         {/* Profile Header */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-3xl p-10 border border-black/5 mb-12 flex items-center gap-8">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-3xl p-10 border border-black/5 mb-12 flex items-center gap-8 shadow-sm">
           <div className="w-20 h-20 bg-ink text-white rounded-full flex items-center justify-center text-3xl font-black">
             {user?.user_metadata?.full_name?.charAt(0) || user?.email?.charAt(0)?.toUpperCase() || '?'}
           </div>
@@ -80,60 +144,120 @@ export const Profile = () => {
             <p className="text-ink-muted">{user?.email}</p>
             <p className="text-xs text-ink-muted mt-1">Joined {new Date(user?.created_at).toLocaleDateString()}</p>
           </div>
-          <div className="ml-auto text-right">
-            <p className="text-4xl font-black">{workflows.length}</p>
-            <p className="text-xs text-ink-muted font-bold uppercase tracking-widest">Workflows Published</p>
+          <div className="ml-auto flex gap-8 text-right">
+             <div>
+              <p className="text-4xl font-black">{purchasedWorkflows.length}</p>
+              <p className="text-xs text-ink-muted font-bold uppercase tracking-widest">Purchased</p>
+             </div>
+             <div>
+              <p className="text-4xl font-black">{publishedWorkflows.length}</p>
+              <p className="text-xs text-ink-muted font-bold uppercase tracking-widest">Published</p>
+            </div>
           </div>
         </motion.div>
 
-        {/* Workflows */}
-        <h2 className="text-2xl font-black tracking-tighter mb-6">MY WORKFLOWS</h2>
+        {/* Purchased Workflows */}
+        <h2 className="text-2xl font-black tracking-tighter mb-6">MY PURCHASES</h2>
+        <div className="mb-16">
+          {purchasedWorkflows.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 text-center border border-black/5">
+              <p className="text-ink-muted font-bold mb-4">You haven't bought any workflows yet.</p>
+              <button onClick={() => navigate('/explore')} className="bg-ink text-white px-8 py-3 rounded-full font-bold hover:opacity-90 transition-opacity">
+                Explore Workflows
+              </button>
+            </div>
+          ) : (
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {purchasedWorkflows.map((wf, i) => (
+                <motion.div
+                  key={`purchased-${wf.id}-${i}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="bg-white rounded-2xl border border-black/5 p-6 flex flex-col gap-4 shadow-sm"
+                >
+                  <div className="flex items-center gap-4">
+                    {wf.imageUrl ? (
+                      <img src={wf.imageUrl} alt={wf.title} className="w-16 h-16 rounded-xl object-cover shrink-0" />
+                    ) : (
+                      <div className="w-16 h-16 bg-surface rounded-xl flex items-center justify-center font-black text-2xl text-ink/20 shrink-0">
+                        {wf.title?.charAt(0)}
+                      </div>
+                    )}
+                    <div className="flex-grow min-w-0">
+                      <h3 className="font-bold text-lg truncate">{wf.title}</h3>
+                      <p className="text-ink-muted text-xs truncate">{wf.description}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-auto pt-4 border-t border-black/5">
+                     <a href={wf.fileUrl} download className="text-center bg-ink text-surface py-2 rounded-xl text-xs font-bold hover:opacity-90 transition-opacity">Download File</a>
+                     <button onClick={() => navigate(`/workflow/${wf.id}`)} className="text-center bg-surface border border-ink/10 text-ink py-2 rounded-xl text-xs font-bold hover:bg-surface-container-highest transition-colors">View Details</button>
+                     {wf.liveUrl && (
+                        <a href={ensureAbsoluteUrl(wf.liveUrl)} target="_blank" rel="noopener noreferrer" className="col-span-2 text-center bg-blue-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
+                          <ExternalLink className="w-4 h-4" /> Open Live System
+                        </a>
+                     )}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
 
-        {workflows.length === 0 ? (
-          <div className="bg-white rounded-3xl p-20 text-center border border-black/5">
-            <p className="text-ink-muted font-bold mb-4">You haven't published any workflows yet.</p>
-            <button onClick={() => navigate('/sell')} className="bg-ink text-white px-8 py-3 rounded-full font-bold hover:opacity-90 transition-opacity">
-              Publish Your First Workflow
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4">
-            {workflows.map((wf, i) => (
-              <motion.div
-                key={wf.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="bg-white rounded-2xl border border-black/5 p-6 flex items-center gap-6"
-              >
-                {wf.imageUrl ? (
-                  <img src={wf.imageUrl} alt={wf.title} className="w-16 h-16 rounded-xl object-cover shrink-0" />
-                ) : (
-                  <div className="w-16 h-16 bg-surface rounded-xl flex items-center justify-center font-black text-2xl text-ink/20 shrink-0">
-                    {wf.title?.charAt(0)}
+        {/* Published Workflows */}
+        <h2 className="text-2xl font-black tracking-tighter mb-6">MY PUBLISHED WORKFLOWS</h2>
+        <div className="mb-12">
+          {publishedWorkflows.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 text-center border border-black/5">
+              <p className="text-ink-muted font-bold mb-4">You haven't published any workflows yet.</p>
+              <button onClick={() => navigate('/sell')} className="bg-surface text-ink px-8 py-3 border border-black/10 rounded-full font-bold hover:bg-surface-container-highest transition-opacity">
+                Publish Your First Workflow
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {publishedWorkflows.map((wf, i) => (
+                <motion.div
+                  key={`pub-${wf.id}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                  className="bg-white rounded-2xl border border-black/5 p-6 flex items-center gap-6 shadow-sm"
+                >
+                  {wf.imageUrl ? (
+                    <img src={wf.imageUrl} alt={wf.title} className="w-16 h-16 rounded-xl object-cover shrink-0" />
+                  ) : (
+                    <div className="w-16 h-16 bg-surface rounded-xl flex items-center justify-center font-black text-2xl text-ink/20 shrink-0">
+                      {wf.title?.charAt(0)}
+                    </div>
+                  )}
+                  <div className="flex-grow min-w-0">
+                    <h3 className="font-bold text-lg truncate">{wf.title}</h3>
+                    <p className="text-ink-muted text-sm truncate">{wf.description}</p>
+                    <div className="flex items-center gap-3 mt-2 flex-wrap">
+                      <span className="text-xs font-bold bg-surface px-3 py-1 rounded-full">{wf.category}</span>
+                      <span className="text-xs font-bold text-ink">${wf.price}</span>
+                      <span className="text-xs text-ink-muted">{new Date(wf.createdAt).toLocaleDateString()}</span>
+                      {wf.liveUrl && (
+                        <a href={ensureAbsoluteUrl(wf.liveUrl)} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-blue-600 flex items-center gap-1 hover:underline">
+                          <ExternalLink className="w-3 h-3" /> Live Demo Attached
+                        </a>
+                      )}
+                    </div>
                   </div>
-                )}
-                <div className="flex-grow min-w-0">
-                  <h3 className="font-bold text-lg truncate">{wf.title}</h3>
-                  <p className="text-ink-muted text-sm truncate">{wf.description}</p>
-                  <div className="flex items-center gap-3 mt-2">
-                    <span className="text-xs font-bold bg-surface px-3 py-1 rounded-full">{wf.category}</span>
-                    <span className="text-xs font-bold text-ink">${wf.price}</span>
-                    <span className="text-xs text-ink-muted">{new Date(wf.createdAt).toLocaleDateString()}</span>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => openEdit(wf)} className="p-3 bg-surface rounded-full hover:bg-surface-container-highest transition-colors">
+                      <Edit2 className="w-4 h-4" />
+                    </motion.button>
+                    <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => deleteWorkflow(wf.id)} className="p-3 bg-red-50 rounded-full hover:bg-red-100 transition-colors text-red-500">
+                      <Trash2 className="w-4 h-4" />
+                    </motion.button>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => openEdit(wf)} className="p-3 bg-surface rounded-full hover:bg-surface-container-highest transition-colors">
-                    <Edit2 className="w-4 h-4" />
-                  </motion.button>
-                  <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={() => deleteWorkflow(wf.id)} className="p-3 bg-red-50 rounded-full hover:bg-red-100 transition-colors text-red-500">
-                    <Trash2 className="w-4 h-4" />
-                  </motion.button>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        )}
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Edit Modal */}

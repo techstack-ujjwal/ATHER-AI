@@ -22,8 +22,22 @@ export const Pricing = () => {
     e.preventDefault();
     setCustomStatus("submitting");
     try {
-      const { error } = await supabase.from('CustomBuildRequest').insert([{ email: customEmail, details: customDetails }]);
-      if (error) throw error;
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      const res = await fetch(`${supabaseUrl}/rest/v1/CustomBuildRequest`, {
+        method: 'POST',
+        headers: {
+          'apikey': anonKey,
+          'Authorization': `Bearer ${anonKey}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({ email: customEmail, details: customDetails })
+      });
+      
+      if (!res.ok) throw new Error('Failed to submit custom build request');
+      
       setCustomStatus("success");
       setTimeout(() => {
         setShowCustomModal(false);
@@ -92,40 +106,69 @@ export const Pricing = () => {
        return;
     }
 
+    console.log("[Pricing] handleSubscribe started for tier:", tier.name);
     setIsProcessing(true);
     
     try {
-      const apiUrl = import.meta.env.VITE_API_URL;
-      if (!apiUrl) {
-        showToast("Backend API URL (VITE_API_URL) is not configured in environment variables.", "error");
+      const rawApiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
+      const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+      console.log("[Pricing] Using API URL:", apiUrl);
+
+      let isLoaded = !!(window as any).Razorpay;
+      if (!isLoaded) {
+        isLoaded = await loadRazorpayScript();
+      }
+
+      if (!isLoaded || !(window as any).Razorpay) {
+        console.error("[Pricing] Razorpay window object missing.");
+        showToast('Razorpay SDK failed to load. Please check your internet or try disabling ad-blockers.', "error");
+        setIsProcessing(false);
         return;
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
+      console.log("[Pricing] Getting session from local storage to avoid SDK deadlock...");
+      let session = null;
+      const localKey = "sb-fvywzznegjfmlaqodfoj-auth-token";
+      const localData = localStorage.getItem(localKey);
+      if (localData) {
+        try {
+          session = JSON.parse(localData);
+        } catch (e) {
+          console.warn("[Pricing] Failed to parse local session", e);
+        }
+      }
+
+      console.log("[Pricing] Session check finished. Session present:", !!session);
+
       if (!session) {
+        console.warn("[Pricing] No active session found.");
         showToast("Please login first to subscribe.", "error");
+        setIsProcessing(false);
         navigate('/login');
         return;
       }
 
-      const res = await loadRazorpayScript();
-      if (!res) {
-        showToast('Razorpay SDK failed to load. Are you offline?', "error");
-        return;
-      }
-
+      console.log("[Pricing] Creating order on backend...");
       const amount = parseInt(tier.price.replace('$', ''));
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
       const orderResponse = await fetch(`${apiUrl}/api/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, currency: 'USD' })
+        body: JSON.stringify({ amount, currency: 'USD' }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       
+      console.log("[Pricing] Order response received:", orderResponse.status);
       if (!orderResponse.ok) {
         throw new Error(`Failed to create order: ${orderResponse.statusText}`);
       }
       
       const orderData = await orderResponse.json();
+      console.log("[Pricing] Order data:", orderData);
 
       const options = {
         key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
@@ -144,18 +187,23 @@ export const Pricing = () => {
                 razorpay_payment_id: response.razorpay_payment_id,
                 razorpay_signature: response.razorpay_signature,
                 userId: session.user.id,
-                orgId: session.user.id
+                tierName: tier.name
               })
             });
             const verifyData = await verifyRes.json();
             if (verifyData.success) {
-               // Update both auth metadata AND the User table
-               await Promise.all([
-                 supabase.auth.updateUser({
-                   data: { plan: tier.name }
-                 }),
-                 supabase.from('User').update({ plan: tier.name }).eq('id', session.user.id)
-               ]);
+               // Update local auth metadata to instantly reflect the new plan in UI
+               // (The actual secure User table update is now handled by the backend)
+               const localData = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
+               if (localData) {
+                 const parsed = JSON.parse(localData);
+                 if (parsed.user) {
+                   parsed.user.user_metadata = { ...parsed.user.user_metadata, plan: tier.name };
+                   localStorage.setItem('sb-fvywzznegjfmlaqodfoj-auth-token', JSON.stringify(parsed));
+                 }
+               }
+               // Dispatch event so Navbar catches it instantly
+               window.dispatchEvent(new Event('auth-updated'));
                
                setSelectedTier(tier.name);
                setShowModal(true);

@@ -27,32 +27,51 @@ export const Navbar = () => {
   };
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        const { data: userData } = await supabase.from('User').select('plan').eq('id', session.user.id).single();
-        if (userData) {
-          setUser(prev => prev ? { ...prev, user_metadata: { ...prev.user_metadata, plan: userData.plan } } : null);
+    const checkUser = async () => {
+      const localData = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
+      if (localData) {
+        try {
+          const session = JSON.parse(localData);
+          if (session?.user) {
+            setUser(session.user);
+            
+            // Fetch latest plan using raw fetch
+            const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+            const res = await fetch(`${supabaseUrl}/rest/v1/User?id=eq.${session.user.id}&select=plan`, {
+              headers: { 'apikey': anonKey, 'Authorization': `Bearer ${session.access_token}` }
+            });
+            const data = await res.json().catch(() => null);
+            if (data && data.length > 0) {
+              const fetchedPlan = data[0].plan;
+              // Update local state
+              setUser((prev: any) => prev ? { ...prev, user_metadata: { ...prev.user_metadata, plan: fetchedPlan } } : null);
+              
+              // Also sync localStorage so other tabs/reloads get it instantly
+              const updatedSession = { ...session, user: { ...session.user, user_metadata: { ...session.user.user_metadata, plan: fetchedPlan } } };
+              localStorage.setItem('sb-fvywzznegjfmlaqodfoj-auth-token', JSON.stringify(updatedSession));
+            }
+          } else {
+            setUser(null);
+          }
+        } catch (e) {
+          console.error("Auth check failed", e);
         }
+      } else {
+        setUser(null);
       }
-    });
+    };
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const { data: userData } = await supabase.from('User').select('plan').eq('id', session.user.id).single();
-        if (userData) {
-          setUser({ ...session.user, user_metadata: { ...session.user.user_metadata, plan: userData.plan } });
-        } else {
-          setUser(session.user);
-        }
-      }
-    });
-
+    checkUser();
+    
+    // Listen for custom auth updates (e.g. from Pricing page purchase)
+    window.addEventListener('auth-updated', checkUser);
+    
     refreshCartCount();
     window.addEventListener('cart-updated', refreshCartCount);
 
     return () => {
-      subscription.unsubscribe();
+      window.removeEventListener('auth-updated', checkUser);
       window.removeEventListener('cart-updated', refreshCartCount);
     };
   }, []);

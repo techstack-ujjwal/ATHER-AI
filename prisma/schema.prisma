@@ -257,6 +257,9 @@ model Subscription {
   id              String          @id @default(uuid())
   organizationId  String          @unique
   organization    Organization    @relation(fields: [organizationId], references: [id])
+  razorpayOrderId     String?     @unique
+  razorpayPaymentId   String?     @unique
+  paymentGateway      String      @default("razorpay")
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 }
@@ -284,6 +287,7 @@ model Workflow {
   price       Float
   fileUrl     String?  
   imageUrl    String?  // Added for thumbnails
+  liveUrl     String?  // Added for live hosted system access
   sellerId    String
   seller      User     @relation(fields: [sellerId], references: [id])
   purchases   Purchase[]
@@ -298,6 +302,9 @@ model Purchase {
   workflowId  String
   workflow    Workflow @relation(fields: [workflowId], references: [id])
   amount      Float
+  razorpayOrderId     String?  @unique
+  razorpayPaymentId   String?  @unique
+  paymentGateway      String   @default("razorpay")
   createdAt   DateTime @default(now())
 }
 

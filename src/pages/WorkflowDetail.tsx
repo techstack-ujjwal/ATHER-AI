@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
-import { ShoppingCart, Download, ArrowLeft, Layers, Zap, Check, Trash2 } from 'lucide-react';
+import { ShoppingCart, Download, ArrowLeft, Layers, Zap, Check, Trash2, ExternalLink } from 'lucide-react';
 
 export const WorkflowDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -12,14 +12,33 @@ export const WorkflowDetail = () => {
   const [added, setAdded] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
+  const ensureAbsoluteUrl = (url: string) => {
+    if (!url) return '#';
+    return url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
+  };
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setCurrentUser(session?.user ?? null);
-    });
+    const localSessionStr = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
+    if (localSessionStr) {
+      setCurrentUser(JSON.parse(localSessionStr).user);
+    }
 
     if (id) {
-      supabase.from('Workflow').select('*').eq('id', id).single().then(({ data }) => {
-        setWorkflow(data);
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      fetch(`${supabaseUrl}/rest/v1/Workflow?id=eq.${id}&select=*`, {
+        headers: { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` }
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.length > 0) {
+          setWorkflow(data[0]);
+        }
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
         setLoading(false);
       });
     }
@@ -40,7 +59,17 @@ export const WorkflowDetail = () => {
 
   const deleteWorkflow = async () => {
     if (!confirm('Delete this workflow permanently?')) return;
-    await supabase.from('Workflow').delete().eq('id', workflow.id);
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    const localSessionStr = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
+    
+    if (localSessionStr) {
+      const token = JSON.parse(localSessionStr).access_token;
+      await fetch(`${supabaseUrl}/rest/v1/Workflow?id=eq.${workflow.id}`, {
+        method: 'DELETE',
+        headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}` }
+      });
+    }
     navigate('/explore');
   };
 
@@ -94,13 +123,27 @@ export const WorkflowDetail = () => {
             {/* Action buttons */}
             <div className="space-y-3">
               {workflow.price === 0 || workflow.price === '0' ? (
-                <a href={workflow.fileUrl} download className="w-full bg-ink text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
-                  <Download className="w-5 h-5" /> Download Free
-                </a>
+                <>
+                  <a href={workflow.fileUrl} download className="w-full bg-ink text-surface py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+                    <Download className="w-5 h-5" /> Download Free
+                  </a>
+                  {workflow.liveUrl && (
+                    <a href={ensureAbsoluteUrl(workflow.liveUrl)} target="_blank" rel="noopener noreferrer" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
+                      <ExternalLink className="w-5 h-5" /> Open Live System
+                    </a>
+                  )}
+                </>
               ) : (
-                <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={addToCart} className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all duration-300 ${added ? 'bg-green-500 text-white' : 'bg-ink text-white hover:opacity-90'}`}>
-                  {added ? <><Check className="w-5 h-5" /> Added to Cart!</> : <><ShoppingCart className="w-5 h-5" /> Add to Cart — ${workflow.price}</>}
-                </motion.button>
+                <>
+                  <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={addToCart} className={`w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all duration-300 ${added ? 'bg-green-500 text-white' : 'bg-ink text-surface hover:opacity-90'}`}>
+                    {added ? <><Check className="w-5 h-5" /> Added to Cart!</> : <><ShoppingCart className="w-5 h-5" /> Add to Cart — ${workflow.price}</>}
+                  </motion.button>
+                  {isOwner && workflow.liveUrl && (
+                    <a href={ensureAbsoluteUrl(workflow.liveUrl)} target="_blank" rel="noopener noreferrer" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
+                      <ExternalLink className="w-5 h-5" /> Open Live System (Creator Access)
+                    </a>
+                  )}
+                </>
               )}
               {isOwner && (
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={deleteWorkflow} className="w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-2 bg-red-50 text-red-500 hover:bg-red-100 transition-colors border border-red-100">
@@ -113,7 +156,12 @@ export const WorkflowDetail = () => {
           {/* Right — Details */}
           <div className="lg:col-span-3">
             <div className="flex flex-wrap gap-2 mb-4">
-              <span className="bg-white border border-black/10 text-xs font-bold px-4 py-2 rounded-full uppercase tracking-wider">{workflow.category}</span>
+              <span className="bg-surface border border-ink/10 text-xs font-bold px-4 py-2 rounded-full uppercase tracking-wider">{workflow.category}</span>
+              {workflow.liveUrl && (
+                <span className="bg-blue-50 text-blue-600 border border-blue-200 text-xs font-bold px-4 py-2 rounded-full uppercase tracking-wider flex items-center gap-1">
+                  <ExternalLink className="w-3 h-3" /> Live Demo Included
+                </span>
+              )}
               <span className={`text-xs font-bold px-4 py-2 rounded-full uppercase tracking-wider ${complexityColor}`}>{workflow.complexity}</span>
               {(workflow.price === 0 || workflow.price === '0') && (
                 <span className="bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-full uppercase tracking-wider">FREE</span>

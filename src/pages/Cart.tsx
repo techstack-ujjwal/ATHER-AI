@@ -29,33 +29,61 @@ export const Cart = () => {
   const handleCheckout = async () => {
     if (cartItems.length === 0) return;
     
+    console.log("[Cart] handleCheckout started.");
     setIsProcessing(true);
+    
     try {
-      const apiUrl = import.meta.env.VITE_API_URL;
-      if (!apiUrl) {
-        showToast("Backend API URL (VITE_API_URL) is not configured.", "error");
+      const rawApiUrl = import.meta.env.VITE_API_URL || "http://localhost:3001";
+      const apiUrl = rawApiUrl.endsWith('/') ? rawApiUrl.slice(0, -1) : rawApiUrl;
+      console.log("[Cart] Using API URL:", apiUrl);
+
+      let isLoaded = !!(window as any).Razorpay;
+      if (!isLoaded) {
+        isLoaded = await loadRazorpayScript();
+      }
+
+      if (!isLoaded || !(window as any).Razorpay) {
+        console.error("[Cart] Razorpay window object missing.");
+        showToast("Razorpay SDK failed to load. Please check your internet or try disabling ad-blockers.", "error");
+        setIsProcessing(false);
         return;
       }
 
-      const { data: { session } } = await supabase.auth.getSession();
+      console.log("[Cart] Getting session from local storage to avoid SDK deadlock...");
+      let session = null;
+      const localKey = "sb-fvywzznegjfmlaqodfoj-auth-token";
+      const localData = localStorage.getItem(localKey);
+      if (localData) {
+        try {
+          session = JSON.parse(localData);
+        } catch (e) {
+          console.warn("[Cart] Failed to parse local session", e);
+        }
+      }
+
+      console.log("[Cart] Session check finished. Session present:", !!session);
+
       if (!session) {
+        console.warn("[Cart] No active session found.");
         showToast("Please login to proceed with checkout.", "error");
+        setIsProcessing(false);
         navigate('/login');
         return;
       }
 
-      const res = await loadRazorpayScript();
-      if (!res) {
-        showToast("Razorpay SDK failed to load.", "error");
-        return;
-      }
+      console.log("[Cart] Creating order on backend...");
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
-      // Create order
       const orderResponse = await fetch(`${apiUrl}/api/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: total, currency: 'USD' })
+        body: JSON.stringify({ amount: total, currency: 'USD' }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
+      
+      console.log("[Cart] Order response received:", orderResponse.status);
 
       if (!orderResponse.ok) {
         throw new Error(`Failed to create order: ${orderResponse.statusText}`);
@@ -78,22 +106,15 @@ export const Cart = () => {
               body: JSON.stringify({
                 razorpay_order_id: response.razorpay_order_id,
                 razorpay_payment_id: response.razorpay_payment_id,
-                razorpay_signature: response.razorpay_signature
+                razorpay_signature: response.razorpay_signature,
+                items: cartItems,
+                userId: session.user.id
               })
             });
             const verifyData = await verifyRes.json();
             
             if (verifyData.success) {
-              // Record purchases for each item
-              const purchaseRecords = cartItems.map(item => ({
-                userId: session.user.id,
-                workflowId: item.id,
-                amount: parseFloat(item.price)
-              }));
-
-              const { error: purchaseError } = await supabase.from('Purchase').insert(purchaseRecords);
-              
-              if (purchaseError) throw purchaseError;
+              // The secure database insert is now handled by your backend
 
               // Clear cart
               localStorage.removeItem('aether_cart');

@@ -18,6 +18,7 @@ export const Sell = () => {
   const [price, setPrice] = useState('49');
   const [file, setFile] = useState<File | null>(null);
   const [thumbnail, setThumbnail] = useState<File | null>(null);
+  const [liveUrl, setLiveUrl] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
 
   const navigate = useNavigate();
@@ -45,72 +46,132 @@ export const Sell = () => {
       return;
     }
 
+    setIsPublishing(true);
+
+    const attemptPublish = async (retries = 2): Promise<void> => {
+      try {
+        const localSessionStr = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
+        if (!localSessionStr) {
+          alert("You must be logged in to sell a workflow.");
+          navigate('/login');
+          return;
+        }
+        
+        const sessionData = JSON.parse(localSessionStr);
+        const token = sessionData.access_token;
+        const userId = sessionData.user.id;
+        const userEmail = sessionData.user.email || 'anonymous';
+        const userName = sessionData.user.user_metadata?.full_name || 'Creator';
+        
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+
+        const uploadDirectly = async (path: string, uploadFile: File) => {
+          const res = await fetch(`${supabaseUrl}/storage/v1/object/workflows/${path}`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': uploadFile.type || 'application/octet-stream'
+            },
+            body: uploadFile
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({ message: res.statusText }));
+            throw new Error(err.message || 'Upload failed');
+          }
+        };
+
+        let fileUrl = '';
+        let imageUrl = '';
+        
+        if (file) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${Math.random()}.${fileExt}`;
+          const filePath = `${userId}/${fileName}`;
+          
+          await uploadDirectly(filePath, file);
+          const { data: { publicUrl } } = supabase.storage.from('workflows').getPublicUrl(filePath);
+          fileUrl = publicUrl;
+        }
+
+        if (thumbnail) {
+          const thumbExt = thumbnail.name.split('.').pop();
+          const thumbName = `thumb_${Math.random()}.${thumbExt}`;
+          const thumbPath = `${userId}/${thumbName}`;
+          
+          await uploadDirectly(thumbPath, thumbnail);
+          const { data: { publicUrl: thumbUrl } } = supabase.storage.from('workflows').getPublicUrl(thumbPath);
+          imageUrl = thumbUrl;
+        }
+
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+        const checkUserRes = await fetch(`${supabaseUrl}/rest/v1/User?id=eq.${userId}&select=id`, {
+          headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}` }
+        });
+        const users = await checkUserRes.json().catch(() => []);
+        
+        if (!users || users.length === 0) {
+          const insertUserRes = await fetch(`${supabaseUrl}/rest/v1/User`, {
+            method: 'POST',
+            headers: {
+              'apikey': anonKey,
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify({ id: userId, email: userEmail, name: userName })
+          });
+          if (!insertUserRes.ok) {
+            const err = await insertUserRes.json().catch(() => ({ message: insertUserRes.statusText }));
+            throw new Error(`Database error (User): ${err.message}`);
+          }
+        }
+
+        const insertWorkflowRes = await fetch(`${supabaseUrl}/rest/v1/Workflow`, {
+          method: 'POST',
+          headers: {
+            'apikey': anonKey,
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            id: crypto.randomUUID(),
+            title,
+            description,
+            category,
+            complexity,
+            price: parseFloat(price),
+            fileUrl,
+            imageUrl,
+            liveUrl: liveUrl.trim() || null,
+            sellerId: userId
+          })
+        });
+
+        if (!insertWorkflowRes.ok) {
+          const err = await insertWorkflowRes.json().catch(() => ({ message: insertWorkflowRes.statusText }));
+          throw new Error(`Database error (Workflow): ${err.message}`);
+        }
+
+        setShowModal(true);
+      } catch (error: any) {
+        if (retries > 0 && error?.message && error.message.includes('Lock')) {
+          console.warn('Handling Supabase lock race condition, retrying...', error.message);
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          return attemptPublish(retries - 1);
+        }
+        throw error;
+      }
+    };
+
     try {
-      setIsPublishing(true);
-      
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert("You must be logged in to sell a workflow.");
-        navigate('/login');
-        return;
-      }
-
-      let fileUrl = '';
-      let imageUrl = '';
-      
-      if (file) {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random()}.${fileExt}`;
-        const filePath = `${session.user.id}/${fileName}`;
-        
-        const { error: uploadError } = await supabase.storage.from('workflows').upload(filePath, file);
-        if (uploadError) throw new Error(`File upload failed: ${uploadError.message}`);
-        
-        const { data: { publicUrl } } = supabase.storage.from('workflows').getPublicUrl(filePath);
-        fileUrl = publicUrl;
-      }
-
-      if (thumbnail) {
-        const thumbExt = thumbnail.name.split('.').pop();
-        const thumbName = `thumb_${Math.random()}.${thumbExt}`;
-        const thumbPath = `${session.user.id}/${thumbName}`;
-        
-        const { error: thumbUploadError } = await supabase.storage.from('workflows').upload(thumbPath, thumbnail);
-        if (thumbUploadError) throw new Error(`Thumbnail upload failed: ${thumbUploadError.message}`);
-        
-        const { data: { publicUrl: thumbUrl } } = supabase.storage.from('workflows').getPublicUrl(thumbPath);
-        imageUrl = thumbUrl;
-      }
-
-      // First, ensure the user exists in the public User table to satisfy the foreign key constraint
-      const { data: existingUser } = await supabase.from('User').select('id').eq('id', session.user.id).maybeSingle();
-      if (!existingUser) {
-        await supabase.from('User').insert({
-          id: session.user.id,
-          email: session.user.email || 'anonymous',
-          name: session.user.user_metadata?.full_name || 'Creator'
-        });
-      }
-
-      const { error: dbError } = await supabase
-        .from('Workflow')
-        .insert({
-          id: crypto.randomUUID(),
-          title,
-          description,
-          category,
-          complexity,
-          price: parseFloat(price),
-          fileUrl,
-          imageUrl,
-          sellerId: session.user.id
-        });
-
-      if (dbError) throw new Error(`Database error: ${dbError.message}`);
-
-      setShowModal(true);
+      await Promise.race([
+        attemptPublish(),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Supabase token lock deadlocked (Wait 10 seconds). Please completely refresh the page (F5) to clear it.')), 10000))
+      ]);
     } catch (error: any) {
-      showToast(`Error publishing workflow: ${error.message}`, 'error');
+      showToast(`${error.message}`, 'error');
     } finally {
       setIsPublishing(false);
     }
@@ -275,7 +336,19 @@ export const Sell = () => {
                       </p>
                     </label>
                     
-                    <div className="flex items-start gap-4 p-6 bg-amber-50 rounded-2xl border border-amber-100">
+                    <div className="space-y-2 pt-4">
+                      <label className="text-xs font-bold uppercase tracking-widest text-ink-muted">Live System URL (Optional)</label>
+                      <input 
+                        type="url" 
+                        value={liveUrl}
+                        onChange={(e) => setLiveUrl(e.target.value)}
+                        placeholder="https://your-agent-app.com"
+                        className="w-full border-b border-black/10 py-4 text-lg outline-none focus:border-ink transition-colors bg-transparent"
+                      />
+                      <p className="text-xs text-ink-muted">Provide a link to a hosted, live version of this agent for buyers to access immediately.</p>
+                    </div>
+                    
+                    <div className="flex items-start gap-4 p-6 bg-amber-50 rounded-2xl border border-amber-100 mt-8">
                       <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                       <p className="text-sm text-amber-800">
                         Make sure to remove any sensitive API keys or personal credentials from your manifest before uploading.
