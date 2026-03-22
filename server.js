@@ -11,6 +11,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get('/', (req, res) => {
+  res.send('Aether AI Backend Server is Running! 🚀');
+});
+
 const prisma = new PrismaClient();
 
 const razorpay = new Razorpay({
