@@ -139,17 +139,23 @@ export const Pricing = () => {
             });
             const verifyData = await verifyRes.json();
             if (verifyData.success) {
-               await supabase.auth.updateUser({
-                  data: { plan: tier.name }
-               });
+               // Update both auth metadata AND the User table
+               await Promise.all([
+                 supabase.auth.updateUser({
+                   data: { plan: tier.name }
+                 }),
+                 supabase.from('User').update({ plan: tier.name }).eq('id', session.user.id)
+               ]);
+               
                setSelectedTier(tier.name);
                setShowModal(true);
+               showToast(`Successfully upgraded to ${tier.name} plan!`, "success");
             } else {
-               alert("Payment verification failed.");
+               showToast("Payment verification failed.", "error");
             }
           } catch (err) {
             console.error(err);
-             alert("Error during verification");
+            showToast("Error during verification", "error");
           }
         },
         prefill: {
