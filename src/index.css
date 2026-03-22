@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-surface: #F9F9F9;
+  --color-surface-container-highest: #E2E2E2;
+  --color-surface-container-low: #F3F3F3;
+  --color-ink: #000000;
+  --color-ink-muted: #666666;
+}
+
+@layer base {
+  body {
+    @apply bg-white text-ink font-sans antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tight font-bold;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/80 backdrop-blur-md border-b border-black/5;
+  }
+  
+  .bento-card {
+    @apply bg-surface rounded-3xl p-8 transition-all duration-300 hover:bg-surface-container-highest;
+  }
+}

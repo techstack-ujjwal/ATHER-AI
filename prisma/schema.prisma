@@ -1,0 +1,287 @@
+// schema.prisma — abridged core models
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  emailVerifiedAt   DateTime?
+  fullName          String?
+  avatarUrl         String?
+  passwordHash      String?
+  authProvider      String    @default("email")
+  authProviderId    String?
+  isActive          Boolean   @default(true)
+  lastLoginAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  memberships       OrganizationMember[]
+  projects          Project[]            @relation("ProjectCreator")
+  discoveryAnswers  DiscoveryAnswer[]
+  createdOrgs       Organization[]       @relation("OrgCreator")
+  workflows         Workflow[]
+}
+
+model OrganizationMember {
+  id              String       @id @default(uuid())
+  organizationId  String
+  userId          String
+  user            User         @relation(fields: [userId], references: [id])
+  organization    Organization @relation(fields: [organizationId], references: [id])
+  role            String       @default("editor")
+  invitedBy       String?
+  acceptedAt      DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([organizationId, userId])
+}
+
+model Organization {
+  id          String    @id @default(uuid())
+  name        String
+  slug        String    @unique
+  logoUrl     String?
+  plan        String    @default("free")
+  planSeats   Int       @default(1)
+  isActive    Boolean   @default(true)
+  createdBy   String
+  creator     User      @relation("OrgCreator", fields: [createdBy], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  members       OrganizationMember[]
+  projects      Project[]
+  subscription  Subscription?
+  usageEvents   UsageEvent[]
+}
+
+model Project {
+  id                  String    @id @default(uuid())
+  organizationId      String
+  organization        Organization @relation(fields: [organizationId], references: [id])
+  createdBy           String
+  creator             User      @relation("ProjectCreator", fields: [createdBy], references: [id])
+  name                String
+  productName         String?
+  productTagline      String?
+  saasCategory        String?
+  status              String    @default("draft")
+  discoveryProgress   Int       @default(0)
+  primaryCtaAction    String?
+  pricingModel        String?
+  isPinned            Boolean   @default(false)
+  lastActivityAt      DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  deletedAt           DateTime?
+
+  discoverySessions   DiscoverySession[]
+  flagshipOutputs     FlagshipOutput[]
+  assets              ProjectAsset[]
+  referenceUrls       ReferenceUrl[]
+  trustSignals        TrustSignal[]
+  integrations        Integration[]
+  testimonials        Testimonial[]
+}
+
+model DiscoverySession {
+  id                String    @id @default(uuid())
+  projectId         String
+  project           Project   @relation(fields: [projectId], references: [id])
+  startedBy         String
+  status            String    @default("active")
+  currentSection    Int       @default(1)
+  currentQuestion   Int       @default(1)
+  questionsAnswered Int       @default(0)
+  completedAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  answers           DiscoveryAnswer[]
+  flagshipOutputs   FlagshipOutput[]
+}
+
+model DiscoveryQuestion {
+  id              String             @id @default(uuid())
+  questionNumber  Int                @unique
+  sectionNumber   Int
+  sectionName     String
+  questionKey     String             @unique
+  questionText    String
+  helperText      String?
+  questionType    String
+  options         Json?
+  isRequired      Boolean            @default(true)
+  displayOrder    Int
+  createdAt       DateTime           @default(now())
+
+  answers         DiscoveryAnswer[]
+}
+
+model DiscoveryAnswer {
+  id              String    @id @default(uuid())
+  sessionId       String
+  session         DiscoverySession @relation(fields: [sessionId], references: [id])
+  projectId       String
+  questionId      String
+  question        DiscoveryQuestion @relation(fields: [questionId], references: [id])
+  questionNumber  Int
+  answerText      String?
+  answerValues    Json?
+  answerUrls      Json?
+  answeredBy      String
+  user            User      @relation(fields: [answeredBy], references: [id])
+  answeredAt      DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([sessionId, questionId])
+}
+
+model FlagshipOutput {
+  id                  String    @id @default(uuid())
+  projectId           String
+  project             Project   @relation(fields: [projectId], references: [id])
+  sessionId           String
+  session             DiscoverySession @relation(fields: [sessionId], references: [id])
+  version             Int       @default(1)
+  status              String    @default("queued")
+  generationModel     String?
+  generationDuration  Int?
+  tokenCount          Int?
+  errorMessage        String?
+  isCurrent           Boolean   @default(false)
+  generatedBy         String?
+  generatedAt         DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  sections            OutputSection[]
+  designSystem        DesignSystem?
+  homepageSections    HomepageSection[]
+  sitePages           SitePage[]
+  generationJob       GenerationJob?
+}
+
+model OutputSection {
+  id              String          @id @default(uuid())
+  outputId        String
+  output          FlagshipOutput  @relation(fields: [outputId], references: [id], onDelete: Cascade)
+  sectionType     String
+  title           String
+  contentMd       String
+  contentData     Json?
+  displayOrder    Int
+  createdAt       DateTime        @default(now())
+}
+
+model DesignSystem {
+  id              String          @id @default(uuid())
+  outputId        String          @unique
+  output          FlagshipOutput  @relation(fields: [outputId], references: [id], onDelete: Cascade)
+  projectId       String
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model HomepageSection {
+  id              String          @id @default(uuid())
+  outputId        String
+  output          FlagshipOutput  @relation(fields: [outputId], references: [id], onDelete: Cascade)
+  sectionType     String
+  displayOrder    Int
+  isIncluded      Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+}
+
+model SitePage {
+  id              String          @id @default(uuid())
+  outputId        String
+  output          FlagshipOutput  @relation(fields: [outputId], references: [id], onDelete: Cascade)
+  pageType        String
+  isRecommended   Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+}
+
+model ProjectAsset {
+  id              String          @id @default(uuid())
+  projectId       String
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt       DateTime        @default(now())
+}
+
+model ReferenceUrl {
+  id              String          @id @default(uuid())
+  projectId       String
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  url             String
+  createdAt       DateTime        @default(now())
+}
+
+model TrustSignal {
+  id              String          @id @default(uuid())
+  projectId       String
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model Integration {
+  id              String          @id @default(uuid())
+  projectId       String
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt       DateTime        @default(now())
+}
+
+model Testimonial {
+  id              String          @id @default(uuid())
+  projectId       String
+  project         Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt       DateTime        @default(now())
+}
+
+model Subscription {
+  id              String          @id @default(uuid())
+  organizationId  String          @unique
+  organization    Organization    @relation(fields: [organizationId], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+}
+
+model UsageEvent {
+  id              String          @id @default(uuid())
+  organizationId  String
+  organization    Organization    @relation(fields: [organizationId], references: [id])
+  createdAt       DateTime        @default(now())
+}
+
+model GenerationJob {
+  id              String          @id @default(uuid())
+  outputId        String          @unique
+  output          FlagshipOutput  @relation(fields: [outputId], references: [id])
+  createdAt       DateTime        @default(now())
+}
+
+model Workflow {
+  id          String   @id @default(uuid())
+  title       String
+  description String
+  category    String
+  complexity  String
+  price       Float
+  fileUrl     String?  
+  sellerId    String
+  seller      User     @relation(fields: [sellerId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
