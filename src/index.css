@@ -1,19 +1,39 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
+:root {
+  --surface: #F9F9F9;
+  --surface-container-highest: #E2E2E2;
+  --surface-container-low: #F3F3F3;
+  --ink: #000000;
+  --ink-muted: #666666;
+  --glass-bg: rgba(255, 255, 255, 0.8);
+  --glass-border: rgba(0, 0, 0, 0.05);
+}
+
+.dark {
+  --surface: #0A0A0A;
+  --surface-container-highest: #1A1A1A;
+  --surface-container-low: #121212;
+  --ink: #FFFFFF;
+  --ink-muted: #A0A0A0;
+  --glass-bg: rgba(10, 10, 10, 0.8);
+  --glass-border: rgba(255, 255, 255, 0.1);
+}
+
 @theme {
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
   
-  --color-surface: #F9F9F9;
-  --color-surface-container-highest: #E2E2E2;
-  --color-surface-container-low: #F3F3F3;
-  --color-ink: #000000;
-  --color-ink-muted: #666666;
+  --color-surface: var(--surface);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
 }
 
 @layer base {
   body {
-    @apply bg-white text-ink font-sans antialiased;
+    @apply bg-surface text-ink font-sans antialiased transition-colors duration-300;
   }
   
   h1, h2, h3, h4, h5, h6 {
@@ -23,10 +43,12 @@
 
 @layer components {
   .glass {
-    @apply bg-white/80 backdrop-blur-md border-b border-black/5;
+    background: var(--glass-bg);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--glass-border);
   }
   
   .bento-card {
-    @apply bg-surface rounded-3xl p-8 transition-all duration-300 hover:bg-surface-container-highest;
+    @apply bg-surface-container-low rounded-3xl p-8 transition-all duration-300 hover:bg-surface-container-highest border border-black/5 dark:border-white/5;
   }
 }

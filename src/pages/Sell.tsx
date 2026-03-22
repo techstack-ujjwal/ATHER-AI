@@ -4,8 +4,10 @@ import { Upload, Plus, Info, Eye, Save, Send, Image as ImageIcon } from 'lucide-
 import { SuccessModal } from '../components/SuccessModal';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
 
 export const Sell = () => {
+  const { showToast } = useToast();
   const [step, setStep] = useState(1);
   const [showModal, setShowModal] = useState(false);
   
@@ -35,11 +37,11 @@ export const Sell = () => {
   const publishWorkflow = async () => {
     // Mandatory field validation
     if (!title.trim()) {
-      alert('Please enter a workflow title before publishing.');
+      showToast('Please enter a workflow title before publishing.', 'error');
       return;
     }
     if (!file) {
-      alert('Please upload a workflow file (.json, .yaml, .txt) before publishing.');
+      showToast('Please upload a workflow file (.json, .yaml, .txt) before publishing.', 'error');
       return;
     }
 
@@ -108,7 +110,7 @@ export const Sell = () => {
 
       setShowModal(true);
     } catch (error: any) {
-      alert(`Error publishing workflow: ${error.message}`);
+      showToast(`Error publishing workflow: ${error.message}`, 'error');
     } finally {
       setIsPublishing(false);
     }

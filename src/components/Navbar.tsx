@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, Search, ShoppingBag, LogOut, User, Shield } from 'lucide-react';
+import { Menu, X, Search, ShoppingBag, LogOut, User, Shield, Sun, Moon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import { supabase } from '../lib/supabaseClient';
+import { useTheme } from '../context/ThemeContext';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -13,6 +14,7 @@ function cn(...inputs: ClassValue[]) {
 const ADMIN_EMAIL = 'ujjwalrajan2@gmail.com';
 
 export const Navbar = () => {
+  const { theme, toggleTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [cartCount, setCartCount] = useState(0);
@@ -25,12 +27,25 @@ export const Navbar = () => {
   };
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        const { data: userData } = await supabase.from('User').select('plan').eq('id', session.user.id).single();
+        if (userData) {
+          setUser(prev => prev ? { ...prev, user_metadata: { ...prev.user_metadata, plan: userData.plan } } : null);
+        }
+      }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user) {
+        const { data: userData } = await supabase.from('User').select('plan').eq('id', session.user.id).single();
+        if (userData) {
+          setUser({ ...session.user, user_metadata: { ...session.user.user_metadata, plan: userData.plan } });
+        } else {
+          setUser(session.user);
+        }
+      }
     });
 
     refreshCartCount();
@@ -105,6 +120,24 @@ export const Navbar = () => {
             </motion.span>
           )}
         </Link>
+        
+        <button 
+          onClick={toggleTheme}
+          className="p-2 hover:bg-surface rounded-full transition-colors group relative"
+          aria-label="Toggle theme"
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={theme}
+              initial={{ y: 20, opacity: 0, rotate: 45 }}
+              animate={{ y: 0, opacity: 1, rotate: 0 }}
+              exit={{ y: -20, opacity: 0, rotate: -45 }}
+              transition={{ duration: 0.2 }}
+            >
+              {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
+            </motion.div>
+          </AnimatePresence>
+        </button>
 
         {user ? (
           <div className="hidden md:flex items-center gap-3">
@@ -119,8 +152,8 @@ export const Navbar = () => {
                 </button>
                 
                 {/* Desktop Dropdown */}
-                <div className="absolute top-full right-0 mt-2 w-64 bg-white/80 backdrop-blur-xl border border-black/5 rounded-[2rem] p-6 shadow-2xl opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-300">
-                  <div className="mb-4 pb-4 border-b border-black/5">
+                <div className="absolute top-full right-0 mt-2 w-64 bg-white/80 dark:bg-surface/80 backdrop-blur-xl border border-black/5 dark:border-white/10 rounded-[2rem] p-6 shadow-2xl opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-300">
+                  <div className="mb-4 pb-4 border-b border-black/5 dark:border-white/10">
                     <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted mb-1">Account</p>
                     <p className="text-sm font-bold truncate">{user.email}</p>
                     <div className="mt-2 inline-block px-3 py-1 bg-ink text-white text-[10px] font-bold rounded-full uppercase tracking-wider">
@@ -170,8 +203,21 @@ export const Navbar = () => {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="absolute top-20 left-0 right-0 bg-white border-b border-black/5 p-6 flex flex-col gap-4 md:hidden"
+            className="absolute top-20 left-0 right-0 bg-white dark:bg-surface border-b border-black/5 p-6 flex flex-col gap-4 md:hidden"
           >
+            <div className="flex items-center justify-between pb-4 border-b border-black/5 mb-2">
+              <span className="text-sm font-bold uppercase tracking-wider text-ink-muted">Theme</span>
+              <button 
+                onClick={toggleTheme}
+                className="flex items-center gap-2 px-4 py-2 bg-surface rounded-full text-xs font-bold"
+              >
+                {theme === 'light' ? (
+                  <><Moon className="w-4 h-4" /> Dark Mode</>
+                ) : (
+                  <><Sun className="w-4 h-4" /> Light Mode</>
+                )}
+              </button>
+            </div>
             {navLinks.map((link) => (
               <Link
                 key={link.path}

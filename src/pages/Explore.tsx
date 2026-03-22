@@ -55,7 +55,8 @@ export const Explore = () => {
       
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-         setUserPlan(session.user.user_metadata?.plan || null);
+         const { data: userData } = await supabase.from('User').select('plan').eq('id', session.user.id).single();
+         setUserPlan(userData?.plan || session.user.user_metadata?.plan || 'Free');
       }
     }
     
