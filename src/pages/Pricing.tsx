@@ -5,8 +5,10 @@ import { SuccessModal } from '../components/SuccessModal';
 import { loadRazorpayScript } from '../lib/razorpayClient';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../context/ToastContext';
 
 export const Pricing = () => {
+  const { showToast } = useToast();
   const [showModal, setShowModal] = useState(false);
   const [selectedTier, setSelectedTier] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);

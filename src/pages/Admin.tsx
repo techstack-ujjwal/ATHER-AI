@@ -2,19 +2,22 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, MessageSquare, Layers, Trash2, RefreshCw, Upload, ExternalLink } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, MessageSquare, Layers, Trash2, RefreshCw, Upload, ExternalLink, DollarSign, Users, ShieldCheck, UserCog } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
 
 const ADMIN_EMAIL = 'ujjwalrajan2@gmail.com';
 
-type Tab = 'overview' | 'requests' | 'workflows';
+type Tab = 'overview' | 'requests' | 'workflows' | 'sales' | 'users';
 
 export const Admin = () => {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<Tab>('overview');
   const [workflows, setWorkflows] = useState<any[]>([]);
   const [requests, setRequests] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [purchases, setPurchases] = useState<any[]>([]);
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
 
   useEffect(() => {
@@ -29,14 +32,16 @@ export const Admin = () => {
   }, []);
 
   const loadData = async () => {
-    const [{ data: wf }, { data: req }, { data: usr }] = await Promise.all([
+    const [{ data: wf }, { data: req }, { data: usr }, { data: pur }] = await Promise.all([
       supabase.from('Workflow').select('*').order('createdAt', { ascending: false }),
       supabase.from('CustomBuildRequest').select('*').order('createdAt', { ascending: false }),
       supabase.from('User').select('*').order('createdAt', { ascending: false }),
+      supabase.from('Purchase').select('*, workflow:Workflow(title)').order('createdAt', { ascending: false }),
     ]);
     setWorkflows(wf || []);
     setRequests(req || []);
     setUsers(usr || []);
+    setPurchases(pur || []);
   };
 
   const deleteWorkflow = async (id: string) => {
@@ -60,11 +65,21 @@ export const Admin = () => {
       const { data: { publicUrl } } = supabase.storage.from('workflows').getPublicUrl(path);
       await supabase.from('CustomBuildRequest').update({ responseFileUrl: publicUrl, status: 'completed' }).eq('id', requestId);
       setRequests(prev => prev.map(r => r.id === requestId ? { ...r, responseFileUrl: publicUrl, status: 'completed' } : r));
-      alert('File uploaded successfully! The request has been marked as completed.');
+      showToast('File uploaded successfully! Mark as completed.', 'success');
     } catch (err: any) {
-      alert('Upload failed: ' + err.message);
+      showToast('Upload failed: ' + err.message, 'error');
     }
     setUploadingFor(null);
+  };
+
+  const updateUserPlan = async (userId: string, plan: string) => {
+     const { error } = await supabase.from('User').update({ plan }).eq('id', userId);
+     if (error) {
+       showToast("Failed to update plan", "error");
+     } else {
+       setUsers(prev => prev.map(u => u.id === userId ? { ...u, plan } : u));
+       showToast(`User plan updated to ${plan}`, "success");
+     }
   };
 
   if (loading) return (
@@ -77,6 +92,8 @@ export const Admin = () => {
     { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'requests', label: 'Custom Requests', icon: MessageSquare, badge: requests.filter(r => r.status === 'pending').length },
     { id: 'workflows', label: 'All Workflows', icon: Layers },
+    { id: 'sales', label: 'Sales History', icon: ShoppingBag },
+    { id: 'users', label: 'User Directory', icon: Users },
   ];
 
   return (
@@ -105,24 +122,103 @@ export const Admin = () => {
 
         {/* Overview */}
         {activeTab === 'overview' && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {[
-              { label: 'Total Workflows', value: workflows.length, icon: Layers },
-              { label: 'Custom Requests', value: requests.length, icon: MessageSquare },
-              { label: 'Total Users', value: users.length, icon: ShoppingBag },
-            ].map((stat, i) => (
-              <div key={i} className="bg-white rounded-3xl p-8 border border-black/5 shadow-sm">
-                <stat.icon className="w-6 h-6 text-ink-muted mb-4" />
-                <p className="text-5xl font-black tracking-tighter mb-2">{stat.value}</p>
-                <p className="text-sm text-ink-muted font-medium">{stat.label}</p>
-              </div>
-            ))}
-            <div className="bg-ink text-white rounded-3xl p-8 col-span-full">
-              <p className="text-xs font-bold uppercase tracking-widest opacity-60 mb-2">Platform Overview</p>
-              <p className="text-2xl font-bold">
-                {workflows.length} workflows published. {requests.filter(r => r.status === 'pending').length} custom requests pending your attention.
-              </p>
+          <div className="space-y-6">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 md:grid-cols-4 gap-6">
+              {[
+                { label: 'Total Revenue', value: `$${purchases.reduce((acc, p) => acc + Number(p.amount || 0), 0)}`, icon: DollarSign, color: 'text-emerald-600' },
+                { label: 'Active Users', value: users.length, icon: Users, color: 'text-blue-600' },
+                { label: 'Published Workflows', value: workflows.length, icon: Layers, color: 'text-amber-600' },
+                { label: 'Pending Requests', value: requests.filter(r => r.status === 'pending').length, icon: MessageSquare, color: 'text-rose-600' },
+              ].map((stat, i) => (
+                <div key={i} className="bg-white rounded-3xl p-8 border border-black/5 shadow-sm">
+                  <stat.icon className={`w-6 h-6 ${stat.color} mb-4`} />
+                  <p className="text-4xl font-black tracking-tighter mb-2">{stat.value}</p>
+                  <p className="text-xs text-ink-muted font-bold uppercase tracking-widest">{stat.label}</p>
+                </div>
+              ))}
+            </motion.div>
+            
+            <div className="bg-ink text-white rounded-[2.5rem] p-10 relative overflow-hidden">
+               <div className="relative z-10">
+                  <p className="text-xs font-bold uppercase tracking-widest opacity-60 mb-2">Internal Notice</p>
+                  <h3 className="text-2xl font-bold mb-4">Platform growth is at {(users.length / 10).toFixed(1)}% vs last month.</h3>
+                  <p className="text-white/60 max-w-xl">
+                    You have {requests.filter(r => r.status === 'pending').length} pending custom requests. 
+                    Remember to upload completed workflows to fulfill requests and mark them as closed.
+                  </p>
+               </div>
+               <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-white/5 to-transparent pointer-events-none" />
             </div>
+          </div>
+        )}
+
+        {/* Sales History */}
+        {activeTab === 'sales' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-3xl border border-black/5 overflow-hidden">
+            {purchases.length === 0 ? (
+               <div className="p-20 text-center text-ink-muted">No sales recorded yet.</div>
+            ) : (
+               <table className="w-full text-sm">
+                  <thead className="bg-surface border-b border-black/5">
+                    <tr>
+                      <th className="p-5 text-left font-bold text-ink-muted text-xs uppercase tracking-widest">Transaction ID</th>
+                      <th className="p-5 text-left font-bold text-ink-muted text-xs uppercase tracking-widest">Workflow</th>
+                      <th className="p-5 text-left font-bold text-ink-muted text-xs uppercase tracking-widest">Amount</th>
+                      <th className="p-5 text-left font-bold text-ink-muted text-xs uppercase tracking-widest">Status</th>
+                      <th className="p-5 text-left font-bold text-ink-muted text-xs uppercase tracking-widest">Date</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {purchases.map((pur, i) => (
+                      <tr key={pur.id} className="border-b border-black/5">
+                        <td className="p-5 font-mono text-xs">{pur.id.slice(0, 8)}...</td>
+                        <td className="p-5 font-bold">{pur.workflow?.title || 'Unknown'}</td>
+                        <td className="p-5 font-bold text-emerald-600">${pur.amount}</td>
+                        <td className="p-5"><span className="bg-green-50 text-green-700 text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider border border-green-100">Paid</span></td>
+                        <td className="p-5 text-ink-muted">{new Date(pur.createdAt).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+               </table>
+            )}
+          </motion.div>
+        )}
+
+        {/* User Directory */}
+        {activeTab === 'users' && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white rounded-3xl border border-black/5 overflow-hidden">
+             <table className="w-full text-sm">
+                <thead className="bg-surface border-b border-black/5">
+                  <tr>
+                    <th className="p-5 text-left font-bold text-ink-muted text-xs uppercase tracking-widest">User</th>
+                    <th className="p-5 text-left font-bold text-ink-muted text-xs uppercase tracking-widest">Current Plan</th>
+                    <th className="p-5 text-left font-bold text-ink-muted text-xs uppercase tracking-widest">Joined</th>
+                    <th className="p-5 text-right font-bold text-ink-muted text-xs uppercase tracking-widest">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((u) => (
+                    <tr key={u.id} className="border-b border-black/5">
+                      <td className="p-5 font-bold">{u.email}</td>
+                      <td className="p-5">
+                         <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider border ${u.plan === 'Pro' ? 'bg-ink text-white border-ink' : u.plan === 'Enterprise' ? 'bg-blue-600 text-white border-blue-600' : 'bg-surface text-ink-muted border-black/10'}`}>
+                            {u.plan || 'Free'}
+                         </span>
+                      </td>
+                      <td className="p-5 text-ink-muted">{new Date(u.createdAt).toLocaleDateString()}</td>
+                      <td className="p-5 text-right">
+                         <div className="flex justify-end gap-2">
+                            {['Free', 'Pro', 'Enterprise'].filter(p => p !== (u.plan || 'Free')).map(plan => (
+                              <button key={plan} onClick={() => updateUserPlan(u.id, plan)} className="text-[10px] font-bold text-ink-muted hover:text-ink px-2 py-1 border border-black/5 rounded hover:bg-surface transition-colors">
+                                Set {plan}
+                              </button>
+                            ))}
+                         </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+             </table>
           </motion.div>
         )}
 

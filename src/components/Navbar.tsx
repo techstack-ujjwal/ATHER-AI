@@ -107,26 +107,53 @@ export const Navbar = () => {
         </Link>
 
         {user ? (
-          <div className="hidden md:flex items-center gap-2">
-            <Link to="/profile" className="flex items-center justify-center bg-surface border border-black/10 text-ink p-2 rounded-full text-sm hover:bg-white transition-colors">
-              <User className="w-4 h-4" />
-            </Link>
-            <button 
-              onClick={() => supabase.auth.signOut()}
-              className="flex items-center justify-center bg-white border border-black/10 text-ink px-6 py-2 rounded-full text-sm font-semibold hover:bg-surface transition-colors gap-2"
-            >
-              <LogOut className="w-4 h-4" /> Sign Out
-            </button>
+          <div className="hidden md:flex items-center gap-3">
+             <div className="relative group">
+                <button className="flex items-center gap-2 p-1 pl-3 bg-surface border border-black/10 rounded-full hover:bg-white transition-all duration-300 group">
+                  <span className="text-xs font-bold text-ink-muted group-hover:text-ink transition-colors">
+                    {user.user_metadata?.plan || 'Free Plan'}
+                  </span>
+                  <div className="w-8 h-8 rounded-full bg-ink text-white flex items-center justify-center font-bold text-xs">
+                    {user.email?.charAt(0).toUpperCase()}
+                  </div>
+                </button>
+                
+                {/* Desktop Dropdown */}
+                <div className="absolute top-full right-0 mt-2 w-64 bg-white/80 backdrop-blur-xl border border-black/5 rounded-[2rem] p-6 shadow-2xl opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-300">
+                  <div className="mb-4 pb-4 border-b border-black/5">
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-ink-muted mb-1">Account</p>
+                    <p className="text-sm font-bold truncate">{user.email}</p>
+                    <div className="mt-2 inline-block px-3 py-1 bg-ink text-white text-[10px] font-bold rounded-full uppercase tracking-wider">
+                      {user.user_metadata?.plan || 'Free'} Plan
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <Link to="/profile" className="flex items-center gap-3 p-2 hover:bg-surface rounded-xl text-sm font-bold transition-colors">
+                      <User className="w-4 h-4 text-ink-muted" /> Profile
+                    </Link>
+                    {isAdmin && (
+                      <Link to="/admin" className="flex items-center gap-3 p-2 hover:bg-surface rounded-xl text-sm font-bold transition-colors">
+                        <Shield className="w-4 h-4 text-ink-muted" /> Admin Panel
+                      </Link>
+                    )}
+                    <button 
+                      onClick={() => supabase.auth.signOut()}
+                      className="w-full flex items-center gap-3 p-2 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-sm font-bold transition-colors"
+                    >
+                      <LogOut className="w-4 h-4" /> Sign Out
+                    </button>
+                  </div>
+                </div>
+             </div>
           </div>
         ) : (
-          <>
-            <Link 
-              to="/login"
-              className="hidden md:flex items-center justify-center bg-white border border-black/10 text-ink px-6 py-2 rounded-full text-sm font-semibold hover:bg-surface transition-colors"
-            >
-              Login
-            </Link>
-          </>
+          <Link 
+            to="/login"
+            className="hidden md:flex items-center justify-center bg-ink text-white px-8 py-2.5 rounded-full text-sm font-bold hover:shadow-xl transition-all duration-300"
+          >
+            Login
+          </Link>
         )}
 
         <button 

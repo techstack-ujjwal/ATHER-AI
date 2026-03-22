@@ -32,8 +32,13 @@ export const Home = () => {
 
   const [featuredWorkflows, setFeaturedWorkflows] = useState<any[]>([]);
   const [stats, setStats] = useState({ workflows: 0, users: 0 });
+  const [userPlan, setUserPlan] = useState<string | null>(null);
 
   useEffect(() => {
+    // Fetch plan
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) setUserPlan(session.user.user_metadata?.plan || null);
+    });
     // Fetch featured workflows
     supabase
       .from('Workflow')
@@ -138,10 +143,11 @@ export const Home = () => {
                   id={wf.id}
                   title={wf.title}
                   category={wf.category}
-                  price={wf.price}
+                  price={Number(wf.price) || 0}
                   complexity={wf.complexity}
                   imageUrl={wf.imageUrl}
                   description={wf.description}
+                  isLocked={(Number(wf.price) || 0) > 0 && !userPlan}
                 />
               ))
             )}

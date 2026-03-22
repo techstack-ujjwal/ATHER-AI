@@ -29,6 +29,9 @@ model User {
   discoveryAnswers  DiscoveryAnswer[]
   createdOrgs       Organization[]       @relation("OrgCreator")
   workflows         Workflow[]
+  purchases         Purchase[]
+  customRequests    CustomBuildRequest[]
+  plan              String?   @default("Free")
 }
 
 model OrganizationMember {
@@ -280,8 +283,31 @@ model Workflow {
   complexity  String
   price       Float
   fileUrl     String?  
+  imageUrl    String?  // Added for thumbnails
   sellerId    String
   seller      User     @relation(fields: [sellerId], references: [id])
+  purchases   Purchase[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model Purchase {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id])
+  amount      Float
+  createdAt   DateTime @default(now())
+}
+
+model CustomBuildRequest {
+  id              String   @id @default(uuid())
+  userId          String?
+  user            User?    @relation(fields: [userId], references: [id])
+  email           String
+  details         String
+  status          String   @default("pending")
+  responseFileUrl String?
+  createdAt       DateTime @default(now())
 }

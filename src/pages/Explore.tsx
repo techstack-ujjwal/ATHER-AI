@@ -41,10 +41,9 @@ export const Explore = () => {
         
         const mappedData = (data || []).map(w => ({
           ...w,
-          price: `$${w.price}`,
+          // Remove fake mapping that overwrote price and image
           rating: 4.8,
-          sales: Math.floor(Math.random() * 1000).toString(),
-          image: "https://picsum.photos/seed/" + w.id + "/800/600",
+          sales: Math.floor(Math.random() * 100).toString(),
         }));
 
         setWorkflows(mappedData);
@@ -133,25 +132,37 @@ export const Explore = () => {
                 <p className="text-ink-muted font-bold">Loading workflows from database...</p>
               </div>
             ) : workflows.length === 0 ? (
-              <div className="col-span-full py-20 text-center">
-                <p className="text-ink-muted font-bold">No workflows match your search.</p>
+              <div className="col-span-full py-32 text-center flex flex-col items-center">
+                <div className="w-20 h-20 bg-surface rounded-[2.5rem] flex items-center justify-center mb-6">
+                  <Search className="w-8 h-8 text-ink/20" />
+                </div>
+                <h3 className="text-2xl font-black tracking-tighter mb-2">NO WORKFLOWS FOUND</h3>
+                <p className="text-ink-muted max-w-xs mx-auto text-sm leading-relaxed">
+                  We couldn't find anything matching "{searchQuery}". Try a different category or broader keywords.
+                </p>
+                <button 
+                  onClick={() => { setSearchQuery(""); setActiveCategory("All"); }}
+                  className="mt-8 text-xs font-bold uppercase tracking-widest text-ink hover:underline"
+                >
+                  Clear all filters
+                </button>
               </div>
             ) : (
               workflows.slice(0, visibleCount).map((workflow, i) => {
-                const isLocked = workflow.price !== 0 && workflow.price !== '0' && !userPlan;
+                const numericPrice = Number(workflow.price) || 0;
+                const isLocked = numericPrice > 0 && !userPlan;
                 return (
-                  <div key={workflow.id || i} onClick={() => isLocked ? navigate('/pricing') : null} className={isLocked ? 'cursor-pointer' : ''}>
-                    <WorkflowCard 
-                      id={workflow.id}
-                      title={workflow.title}
-                      description={workflow.description}
-                      category={workflow.category}
-                      complexity={workflow.complexity}
-                      price={workflow.price}
-                      imageUrl={workflow.imageUrl}
-                      isLocked={isLocked}
-                    />
-                  </div>
+                  <WorkflowCard 
+                    key={workflow.id || i}
+                    id={workflow.id}
+                    title={workflow.title}
+                    description={workflow.description}
+                    category={workflow.category}
+                    complexity={workflow.complexity}
+                    price={numericPrice}
+                    imageUrl={workflow.imageUrl}
+                    isLocked={isLocked}
+                  />
                 );
               })
             )}

@@ -7,6 +7,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
+import { ToastProvider } from './context/ToastContext';
 import { Home } from './pages/Home';
 import { Explore } from './pages/Explore';
 import { Sell } from './pages/Sell';
@@ -37,24 +38,26 @@ const PageWrapper = ({ children }: { children: React.ReactNode }) => {
 
 export default function App() {
   return (
-    <Router>
-      <div className="min-h-screen flex flex-col">
-        <Navbar />
-        <main className="flex-grow">
-          <Routes>
-            <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
-            <Route path="/explore" element={<PageWrapper><Explore /></PageWrapper>} />
-            <Route path="/sell" element={<PageWrapper><Sell /></PageWrapper>} />
-            <Route path="/pricing" element={<PageWrapper><Pricing /></PageWrapper>} />
-            <Route path="/login" element={<PageWrapper><Login /></PageWrapper>} />
-            <Route path="/admin" element={<PageWrapper><Admin /></PageWrapper>} />
-            <Route path="/profile" element={<PageWrapper><Profile /></PageWrapper>} />
-            <Route path="/cart" element={<PageWrapper><Cart /></PageWrapper>} />
-            <Route path="/workflow/:id" element={<PageWrapper><WorkflowDetail /></PageWrapper>} />
-          </Routes>
-        </main>
-        <Footer />
-      </div>
-    </Router>
+    <ToastProvider>
+      <Router>
+        <div className="min-h-screen flex flex-col">
+          <Navbar />
+          <main className="flex-grow">
+            <Routes>
+              <Route path="/" element={<PageWrapper><Home /></PageWrapper>} />
+              <Route path="/explore" element={<PageWrapper><Explore /></PageWrapper>} />
+              <Route path="/sell" element={<PageWrapper><Sell /></PageWrapper>} />
+              <Route path="/pricing" element={<PageWrapper><Pricing /></PageWrapper>} />
+              <Route path="/login" element={<PageWrapper><Login /></PageWrapper>} />
+              <Route path="/admin" element={<PageWrapper><Admin /></PageWrapper>} />
+              <Route path="/profile" element={<PageWrapper><Profile /></PageWrapper>} />
+              <Route path="/cart" element={<PageWrapper><Cart /></PageWrapper>} />
+              <Route path="/workflow/:id" element={<PageWrapper><WorkflowDetail /></PageWrapper>} />
+            </Routes>
+          </main>
+          <Footer />
+        </div>
+      </Router>
+    </ToastProvider>
   );
 }
