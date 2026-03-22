@@ -45,7 +45,8 @@ export const WorkflowCard = ({ id, title, category, price, rating, sales, image,
   };
 
   const displayImage = imageUrl || image;
-  const numericPrice = typeof price === 'string' ? parseFloat(price) : price;
+  const rawPrice = price ?? 0;
+  const numericPrice = typeof rawPrice === 'number' ? rawPrice : (parseFloat(String(rawPrice).replace(/[^0-9.]/g, '')) || 0);
   const isFree = numericPrice === 0;
   const displayPrice = isFree ? 'Free' : `$${numericPrice}`;
 

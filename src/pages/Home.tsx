@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowRight, Zap, Shield, Globe, Sparkles, X } from 'lucide-react';
 import { WorkflowCard } from '../components/WorkflowCard';
@@ -30,35 +30,16 @@ export const Home = () => {
     }
   };
 
-  const featuredWorkflows = [
-    {
-      title: "Autonomous Content Engine",
-      category: "Marketing",
-      price: "$49",
-      rating: 4.9,
-      sales: "1.2k",
-      image: "https://picsum.photos/seed/ai1/800/600",
-      complexity: "High" as const
-    },
-    {
-      title: "Smart Data Synthesizer",
-      category: "Analytics",
-      price: "$29",
-      rating: 4.8,
-      sales: "850",
-      image: "https://picsum.photos/seed/ai2/800/600",
-      complexity: "Medium" as const
-    },
-    {
-      title: "Visual Identity Generator",
-      category: "Design",
-      price: "Free",
-      rating: 4.7,
-      sales: "3.4k",
-      image: "https://picsum.photos/seed/ai3/800/600",
-      complexity: "Low" as const
-    }
-  ];
+  const [featuredWorkflows, setFeaturedWorkflows] = useState<any[]>([]);
+
+  useEffect(() => {
+    supabase
+      .from('Workflow')
+      .select('id, title, category, price, complexity, imageUrl, description')
+      .order('createdAt', { ascending: false })
+      .limit(3)
+      .then(({ data }) => setFeaturedWorkflows(data || []));
+  }, []);
 
   return (
     <div className="pt-20">
@@ -133,9 +114,24 @@ export const Home = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {featuredWorkflows.map((workflow, i) => (
-              <WorkflowCard key={i} {...workflow} />
-            ))}
+            {featuredWorkflows.length === 0 ? (
+              <div className="col-span-3 py-16 text-center text-ink-muted font-bold">
+                No workflows yet — <Link to="/sell" className="underline">be the first to publish one!</Link>
+              </div>
+            ) : (
+              featuredWorkflows.map((wf) => (
+                <WorkflowCard
+                  key={wf.id}
+                  id={wf.id}
+                  title={wf.title}
+                  category={wf.category}
+                  price={wf.price}
+                  complexity={wf.complexity}
+                  imageUrl={wf.imageUrl}
+                  description={wf.description}
+                />
+              ))
+            )}
           </div>
         </div>
       </section>
