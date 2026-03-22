@@ -79,12 +79,16 @@ export const WorkflowDetail = () => {
           <div className="lg:col-span-2">
             <div className="bg-white rounded-3xl overflow-hidden border border-black/5 shadow-sm mb-6">
               {workflow.imageUrl ? (
-                <img src={workflow.imageUrl} alt={workflow.title} className="w-full aspect-[4/3] object-cover" />
-              ) : (
-                <div className="w-full aspect-[4/3] bg-surface flex items-center justify-center">
-                  <span className="text-7xl font-black text-ink/10">{workflow.title?.charAt(0)}</span>
-                </div>
-              )}
+                <img 
+                  src={workflow.imageUrl} 
+                  alt={workflow.title} 
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
+                  className="w-full aspect-[4/3] object-cover" 
+                />
+              ) : null}
+              <div className={`w-full aspect-[4/3] bg-surface flex items-center justify-center ${workflow.imageUrl ? 'hidden' : ''}`}>
+                <span className="text-7xl font-black text-ink/10">{workflow.title?.charAt(0)}</span>
+              </div>
             </div>
 
             {/* Action buttons */}

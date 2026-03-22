@@ -61,14 +61,14 @@ export const WorkflowCard = ({ id, title, category, price, rating, sales, image,
           <img 
             src={displayImage} 
             alt={title} 
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden'); }}
             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
             referrerPolicy="no-referrer"
           />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <span className="text-5xl font-black text-ink/10">{title?.charAt(0)}</span>
-          </div>
-        )}
+        ) : null}
+        <div className={`w-full h-full flex items-center justify-center ${displayImage ? 'hidden' : ''}`}>
+          <span className="text-5xl font-black text-ink/10">{title?.charAt(0)}</span>
+        </div>
         <div className="absolute top-4 left-4 flex gap-2 flex-wrap">
           <span className="bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider">
             {category}

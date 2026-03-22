@@ -31,14 +31,27 @@ export const Home = () => {
   };
 
   const [featuredWorkflows, setFeaturedWorkflows] = useState<any[]>([]);
+  const [stats, setStats] = useState({ workflows: 0, users: 0 });
 
   useEffect(() => {
+    // Fetch featured workflows
     supabase
       .from('Workflow')
       .select('id, title, category, price, complexity, imageUrl, description')
       .order('createdAt', { ascending: false })
       .limit(3)
       .then(({ data }) => setFeaturedWorkflows(data || []));
+
+    // Fetch stats
+    Promise.all([
+      supabase.from('Workflow').select('*', { count: 'exact', head: true }),
+      supabase.from('User').select('*', { count: 'exact', head: true })
+    ]).then(([wf, usr]) => {
+      setStats({
+        workflows: wf.count || 0,
+        users: usr.count || 0
+      });
+    });
   }, []);
 
   return (
@@ -140,11 +153,11 @@ export const Home = () => {
       <section className="px-6 md:px-12 py-24 border-y border-black/5">
         <div className="max-w-7xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-12">
           <div className="text-center">
-            <div className="text-4xl font-black mb-2">12k+</div>
+            <div className="text-4xl font-black mb-2">{stats.users}+</div>
             <div className="text-xs font-bold uppercase tracking-widest text-ink-muted">Active Users</div>
           </div>
           <div className="text-center">
-            <div className="text-4xl font-black mb-2">450+</div>
+            <div className="text-4xl font-black mb-2">{stats.workflows}+</div>
             <div className="text-xs font-bold uppercase tracking-widest text-ink-muted">Workflows</div>
           </div>
           <div className="text-center">
@@ -152,7 +165,7 @@ export const Home = () => {
             <div className="text-xs font-bold uppercase tracking-widest text-ink-muted">Uptime</div>
           </div>
           <div className="text-center">
-            <div className="text-4xl font-black mb-2">$2.4M</div>
+            <div className="text-4xl font-black mb-2">$0</div>
             <div className="text-xs font-bold uppercase tracking-widest text-ink-muted">Creator Earnings</div>
           </div>
         </div>
