@@ -230,6 +230,10 @@ export const Sell = () => {
                         <h3 className="font-bold">Standard License</h3>
                         <span className="text-xs font-bold bg-ink text-white px-3 py-1 rounded-full uppercase">Recommended</span>
                       </div>
+                      <div className="flex gap-3 mb-6">
+                        <button onClick={() => setPrice('0')} className={`px-5 py-2 rounded-full text-sm font-bold border transition-all ${price === '0' ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white border-black/10 text-ink-muted'}`}>Free</button>
+                        <button onClick={() => { if (price === '0') setPrice('49'); }} className={`px-5 py-2 rounded-full text-sm font-bold border transition-all ${price !== '0' ? 'bg-ink text-white border-ink' : 'bg-white border-black/10 text-ink-muted'}`}>Paid</button>
+                      </div>
                       <div className="flex items-end gap-2 mb-8">
                         <span className="text-4xl font-black">$</span>
                         <input 

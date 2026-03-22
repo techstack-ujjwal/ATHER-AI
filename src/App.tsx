@@ -15,6 +15,7 @@ import { Login } from './pages/Login';
 import { Admin } from './pages/Admin';
 import { Profile } from './pages/Profile';
 import { Cart } from './pages/Cart';
+import { WorkflowDetail } from './pages/WorkflowDetail';
 import { motion, AnimatePresence } from 'motion/react';
 
 const PageWrapper = ({ children }: { children: React.ReactNode }) => {
@@ -49,6 +50,7 @@ export default function App() {
             <Route path="/admin" element={<PageWrapper><Admin /></PageWrapper>} />
             <Route path="/profile" element={<PageWrapper><Profile /></PageWrapper>} />
             <Route path="/cart" element={<PageWrapper><Cart /></PageWrapper>} />
+            <Route path="/workflow/:id" element={<PageWrapper><WorkflowDetail /></PageWrapper>} />
           </Routes>
         </main>
         <Footer />
