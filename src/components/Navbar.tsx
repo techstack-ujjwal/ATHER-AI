@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useLocation } from 'react-router-dom';
-import { Menu, X, Search, ShoppingBag, LogOut } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, X, Search, ShoppingBag, LogOut, User, Shield } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
@@ -10,10 +10,19 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+const ADMIN_EMAIL = 'ujjwalrajan2@gmail.com';
+
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [cartCount, setCartCount] = useState(0);
   const location = useLocation();
+  const navigate = useNavigate();
+
+  const refreshCartCount = () => {
+    const stored = localStorage.getItem('aether_cart');
+    setCartCount(stored ? JSON.parse(stored).length : 0);
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -24,8 +33,16 @@ export const Navbar = () => {
       setUser(session?.user ?? null);
     });
 
-    return () => subscription.unsubscribe();
+    refreshCartCount();
+    window.addEventListener('cart-updated', refreshCartCount);
+
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('cart-updated', refreshCartCount);
+    };
   }, []);
+
+  const isAdmin = user?.email === ADMIN_EMAIL;
 
   const navLinks = [
     { name: 'Explore', path: '/explore' },
@@ -53,6 +70,11 @@ export const Navbar = () => {
               {link.name}
             </Link>
           ))}
+          {isAdmin && (
+            <Link to="/admin" className={cn("text-sm font-medium transition-colors hover:text-ink flex items-center gap-1", location.pathname === '/admin' ? "text-ink" : "text-ink-muted")}>
+              <Shield className="w-3 h-3" /> Admin
+            </Link>
+          )}
         </div>
       </div>
 
@@ -65,23 +87,37 @@ export const Navbar = () => {
             className="bg-transparent border-none outline-none text-sm ml-2 w-48"
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                window.location.href = `/explore?q=${e.currentTarget.value}`;
+                navigate(`/explore?q=${e.currentTarget.value}`);
               }
             }}
           />
         </div>
         
-        <button onClick={() => alert("Your cart is currently empty.")} className="p-2 hover:bg-surface rounded-full transition-colors relative">
+        <Link to="/cart" className="p-2 hover:bg-surface rounded-full transition-colors relative">
           <ShoppingBag className="w-5 h-5" />
-        </button>
+          {cartCount > 0 && (
+            <motion.span
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              className="absolute -top-1 -right-1 bg-ink text-white text-[10px] font-black w-4 h-4 rounded-full flex items-center justify-center"
+            >
+              {cartCount}
+            </motion.span>
+          )}
+        </Link>
 
         {user ? (
-          <button 
-            onClick={() => supabase.auth.signOut()}
-            className="hidden md:flex items-center justify-center bg-white border border-black/10 text-ink px-6 py-2 rounded-full text-sm font-semibold hover:bg-surface transition-colors gap-2"
-          >
-            <LogOut className="w-4 h-4" /> Sign Out
-          </button>
+          <div className="hidden md:flex items-center gap-2">
+            <Link to="/profile" className="flex items-center justify-center bg-surface border border-black/10 text-ink p-2 rounded-full text-sm hover:bg-white transition-colors">
+              <User className="w-4 h-4" />
+            </Link>
+            <button 
+              onClick={() => supabase.auth.signOut()}
+              className="flex items-center justify-center bg-white border border-black/10 text-ink px-6 py-2 rounded-full text-sm font-semibold hover:bg-surface transition-colors gap-2"
+            >
+              <LogOut className="w-4 h-4" /> Sign Out
+            </button>
+          </div>
         ) : (
           <>
             <Link 
@@ -119,16 +155,23 @@ export const Navbar = () => {
                 {link.name}
               </Link>
             ))}
+            {isAdmin && (
+              <Link to="/admin" onClick={() => setIsOpen(false)} className="text-lg font-medium flex items-center gap-2">
+                <Shield className="w-4 h-4" /> Admin
+              </Link>
+            )}
             {user ? (
-              <button 
-                onClick={() => {
-                  supabase.auth.signOut();
-                  setIsOpen(false);
-                }}
-                className="bg-surface border border-black/10 text-ink px-6 py-3 rounded-full text-sm font-semibold w-full text-center flex items-center justify-center gap-2"
-              >
-                <LogOut className="w-4 h-4" /> Sign Out
-              </button>
+              <>
+                <Link to="/profile" onClick={() => setIsOpen(false)} className="text-lg font-medium flex items-center gap-2">
+                  <User className="w-4 h-4" /> My Profile
+                </Link>
+                <button 
+                  onClick={() => { supabase.auth.signOut(); setIsOpen(false); }}
+                  className="bg-surface border border-black/10 text-ink px-6 py-3 rounded-full text-sm font-semibold w-full text-center flex items-center justify-center gap-2"
+                >
+                  <LogOut className="w-4 h-4" /> Sign Out
+                </button>
+              </>
             ) : (
               <>
                 <Link 

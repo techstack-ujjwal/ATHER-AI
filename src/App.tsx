@@ -12,6 +12,9 @@ import { Explore } from './pages/Explore';
 import { Sell } from './pages/Sell';
 import { Pricing } from './pages/Pricing';
 import { Login } from './pages/Login';
+import { Admin } from './pages/Admin';
+import { Profile } from './pages/Profile';
+import { Cart } from './pages/Cart';
 import { motion, AnimatePresence } from 'motion/react';
 
 const PageWrapper = ({ children }: { children: React.ReactNode }) => {
@@ -43,6 +46,9 @@ export default function App() {
             <Route path="/sell" element={<PageWrapper><Sell /></PageWrapper>} />
             <Route path="/pricing" element={<PageWrapper><Pricing /></PageWrapper>} />
             <Route path="/login" element={<PageWrapper><Login /></PageWrapper>} />
+            <Route path="/admin" element={<PageWrapper><Admin /></PageWrapper>} />
+            <Route path="/profile" element={<PageWrapper><Profile /></PageWrapper>} />
+            <Route path="/cart" element={<PageWrapper><Cart /></PageWrapper>} />
           </Routes>
         </main>
         <Footer />
@@ -50,4 +56,3 @@ export default function App() {
     </Router>
   );
 }
-

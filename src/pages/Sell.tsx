@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
-import { Upload, Plus, Info, Eye, Save, Send } from 'lucide-react';
+import { Upload, Plus, Info, Eye, Save, Send, Image as ImageIcon } from 'lucide-react';
 import { SuccessModal } from '../components/SuccessModal';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
@@ -15,6 +15,7 @@ export const Sell = () => {
   const [complexity, setComplexity] = useState('Medium');
   const [price, setPrice] = useState('49');
   const [file, setFile] = useState<File | null>(null);
+  const [thumbnail, setThumbnail] = useState<File | null>(null);
   const [isPublishing, setIsPublishing] = useState(false);
 
   const navigate = useNavigate();
@@ -22,6 +23,12 @@ export const Sell = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
+    }
+  };
+
+  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setThumbnail(e.target.files[0]);
     }
   };
 
@@ -37,23 +44,30 @@ export const Sell = () => {
       }
 
       let fileUrl = '';
+      let imageUrl = '';
       
       if (file) {
         const fileExt = file.name.split('.').pop();
         const fileName = `${Math.random()}.${fileExt}`;
         const filePath = `${session.user.id}/${fileName}`;
         
-        const { error: uploadError } = await supabase.storage
-          .from('workflows')
-          .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
+        const { error: uploadError } = await supabase.storage.from('workflows').upload(filePath, file);
+        if (uploadError) throw new Error(`File upload failed: ${uploadError.message}`);
         
-        const { data: { publicUrl } } = supabase.storage
-          .from('workflows')
-          .getPublicUrl(filePath);
-        
+        const { data: { publicUrl } } = supabase.storage.from('workflows').getPublicUrl(filePath);
         fileUrl = publicUrl;
+      }
+
+      if (thumbnail) {
+        const thumbExt = thumbnail.name.split('.').pop();
+        const thumbName = `thumb_${Math.random()}.${thumbExt}`;
+        const thumbPath = `${session.user.id}/${thumbName}`;
+        
+        const { error: thumbUploadError } = await supabase.storage.from('workflows').upload(thumbPath, thumbnail);
+        if (thumbUploadError) throw new Error(`Thumbnail upload failed: ${thumbUploadError.message}`);
+        
+        const { data: { publicUrl: thumbUrl } } = supabase.storage.from('workflows').getPublicUrl(thumbPath);
+        imageUrl = thumbUrl;
       }
 
       // First, ensure the user exists in the public User table to satisfy the foreign key constraint
@@ -76,10 +90,11 @@ export const Sell = () => {
           complexity,
           price: parseFloat(price),
           fileUrl,
+          imageUrl,
           sellerId: session.user.id
         });
 
-      if (dbError) throw dbError;
+      if (dbError) throw new Error(`Database error: ${dbError.message}`);
 
       setShowModal(true);
     } catch (error: any) {
@@ -139,6 +154,24 @@ export const Sell = () => {
                         placeholder="Explain what this workflow accomplishes in one sentence..."
                         className="w-full border border-black/10 rounded-2xl p-4 min-h-[100px] outline-none focus:border-ink transition-colors"
                       />
+                    </div>
+
+                    <div className="space-y-2 mb-8">
+                      <label className="text-xs font-bold uppercase tracking-widest text-ink-muted">Thumbnail Image</label>
+                      <label className="flex items-center gap-4 p-4 border border-black/10 rounded-2xl hover:bg-surface cursor-pointer transition-colors group">
+                        <input type="file" onChange={handleThumbnailChange} className="hidden" accept="image/*" />
+                        <div className="w-12 h-12 bg-surface rounded-full flex items-center justify-center group-hover:scale-110 transition-transform shrink-0">
+                          {thumbnail ? (
+                            <img src={URL.createObjectURL(thumbnail)} alt="thumb" className="w-full h-full object-cover rounded-full" />
+                          ) : (
+                            <ImageIcon className="w-5 h-5 text-ink-muted" />
+                          )}
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm text-ink">{thumbnail ? thumbnail.name : 'Upload cover image'}</p>
+                          <p className="text-xs text-ink-muted">16:9 ratio recommended (JPG, PNG)</p>
+                        </div>
+                      </label>
                     </div>
 
                     <div className="grid grid-cols-2 gap-6">
@@ -285,8 +318,12 @@ export const Sell = () => {
             </div>
 
             <div className="bg-white rounded-3xl shadow-xl shadow-black/5 overflow-hidden border border-black/5">
-              <div className="aspect-[4/3] bg-surface-container-highest flex items-center justify-center">
-                <span className="font-black text-4xl text-ink/20">{title ? title.charAt(0).toUpperCase() : '?'}</span>
+              <div className="aspect-[4/3] bg-surface-container-highest flex items-center justify-center relative">
+                {thumbnail ? (
+                  <img src={URL.createObjectURL(thumbnail)} alt="Preview" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="font-black text-4xl text-ink/20">{title ? title.charAt(0).toUpperCase() : '?'}</span>
+                )}
               </div>
               <div className="p-8">
                 <h3 className="font-bold text-lg leading-tight mb-2 truncate">{title || 'Workflow Title'}</h3>
