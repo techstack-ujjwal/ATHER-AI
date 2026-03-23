@@ -19,6 +19,7 @@ import { Admin } from './pages/Admin';
 import { Profile } from './pages/Profile';
 import { Cart } from './pages/Cart';
 import { WorkflowDetail } from './pages/WorkflowDetail';
+import { RunWorkflow } from './pages/RunWorkflow';
 import { motion, AnimatePresence } from 'motion/react';
 
 const PageWrapper = ({ children }: { children: React.ReactNode }) => {
@@ -72,6 +73,7 @@ export default function App() {
                 <Route path="/profile" element={<PageWrapper><Profile /></PageWrapper>} />
                 <Route path="/cart" element={<PageWrapper><Cart /></PageWrapper>} />
                 <Route path="/workflow/:id" element={<PageWrapper><WorkflowDetail /></PageWrapper>} />
+                <Route path="/run/:workflowId" element={<PageWrapper><RunWorkflow /></PageWrapper>} />
               </Routes>
             </main>
             <Footer />

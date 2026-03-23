@@ -290,6 +290,9 @@ export const Profile = () => {
                     </div>
                   </div>
                     <div className="grid grid-cols-2 gap-2 mt-auto pt-4 border-t border-black/5">
+                        <button onClick={() => navigate(`/run/${wf.id}`)} className="col-span-2 text-center bg-green-500 text-white py-3 rounded-xl text-sm font-black hover:bg-green-600 transition-colors shadow-sm">
+                          Run Workflow
+                        </button>
                        <a 
                          href={`${wf.fileUrl}${wf.fileUrl.includes('?') ? '&' : '?'}download=`} 
                          download 

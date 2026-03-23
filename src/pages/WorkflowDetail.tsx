@@ -11,6 +11,7 @@ export const WorkflowDetail = () => {
   const [loading, setLoading] = useState(true);
   const [added, setAdded] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUserPlan, setCurrentUserPlan] = useState<string>('Free');
 
   const ensureAbsoluteUrl = (url: string) => {
     if (!url) return '#';
@@ -20,7 +21,11 @@ export const WorkflowDetail = () => {
   useEffect(() => {
     const localSessionStr = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
     if (localSessionStr) {
-      setCurrentUser(JSON.parse(localSessionStr).user);
+      const parsed = JSON.parse(localSessionStr);
+      setCurrentUser(parsed.user);
+      if (parsed.user?.user_metadata?.plan) {
+         setCurrentUserPlan(parsed.user.user_metadata.plan);
+      }
     }
 
     async function fetchWorkflow() {
@@ -93,6 +98,10 @@ export const WorkflowDetail = () => {
 
   const complexityColor = workflow.complexity === 'Low' ? 'text-emerald-600 bg-emerald-50' : workflow.complexity === 'Medium' ? 'text-amber-600 bg-amber-50' : 'text-rose-600 bg-rose-50';
 
+  const hasPremiumAccess = currentUserPlan === 'Pro' || currentUserPlan === 'Architect' || currentUserPlan === 'Enterprise';
+  const isFree = workflow.price === 0 || workflow.price === '0';
+  const canAccess = isFree || hasPremiumAccess;
+
   return (
     <div className="pt-20 min-h-screen bg-surface">
       <div className="max-w-5xl mx-auto px-6 md:px-12 py-12">
@@ -123,14 +132,20 @@ export const WorkflowDetail = () => {
 
             {/* Action buttons */}
             <div className="space-y-3">
-              {workflow.price === 0 || workflow.price === '0' ? (
+              {canAccess ? (
                 <>
+                  <button 
+                    onClick={() => navigate(`/run/${workflow.id}`)}
+                    className="w-full bg-[#E5FF00] text-black py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#CCFF00] transition-colors shadow-lg shadow-[#E5FF00]/20"
+                  >
+                    <Zap className="w-5 h-5" /> Run Workflow
+                  </button>
                   <a 
                     href={`${workflow.fileUrl}${workflow.fileUrl.includes('?') ? '&' : '?'}download=`} 
                     download 
                     className="w-full bg-ink text-surface py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
                   >
-                    <Download className="w-5 h-5" /> Download Free
+                    <Download className="w-5 h-5" /> Download {hasPremiumAccess && !isFree ? '(Pro)' : 'Free'}
                   </a>
                   {workflow.liveUrl && (
                     <a href={ensureAbsoluteUrl(workflow.liveUrl)} target="_blank" rel="noopener noreferrer" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">
