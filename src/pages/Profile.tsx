@@ -61,8 +61,9 @@ export const Profile = () => {
           setSales((salesData || []).map((s: any) => ({ ...s, workflow: Array.isArray(s.workflow) ? s.workflow[0] : s.workflow })));
         }
 
-        // Fetch My Custom Build Requests
-        const reqRes = await fetch(`${supabaseUrl}/rest/v1/CustomBuildRequest?email=eq.${encodeURIComponent(session.user.email)}&order=createdAt.desc&select=*`, { headers });
+        // Fetch My Custom Build Requests - Using case-insensitive ilike for email
+        const userEmail = session.user.email?.toLowerCase();
+        const reqRes = await fetch(`${supabaseUrl}/rest/v1/CustomBuildRequest?email=ilike.${encodeURIComponent(userEmail)}&order=createdAt.desc&select=*`, { headers });
         const reqData = await reqRes.json().catch(() => []);
         setMyRequests(reqData || []);
 
@@ -206,9 +207,16 @@ export const Profile = () => {
         )}
 
         {/* My Custom Requests */}
-        {myRequests.length > 0 && (
-          <div className="mb-16">
-            <h2 className="text-2xl font-black tracking-tighter mb-6">MY CUSTOM REQUESTS</h2>
+        <div className="mb-16">
+          <h2 className="text-2xl font-black tracking-tighter mb-6">MY CUSTOM REQUESTS</h2>
+          {myRequests.length === 0 ? (
+            <div className="bg-white rounded-3xl p-12 text-center border border-black/5">
+              <p className="text-ink-muted font-bold mb-4">You haven't requested any custom builds yet.</p>
+              <button onClick={() => navigate('/pricing')} className="bg-ink text-white px-8 py-3 rounded-full font-bold hover:opacity-90 transition-opacity">
+                Request a Custom Build
+              </button>
+            </div>
+          ) : (
             <div className="space-y-4">
               {myRequests.map((req: any, i: number) => (
                 <motion.div key={req.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm">
@@ -231,8 +239,8 @@ export const Profile = () => {
                 </motion.div>
               ))}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Purchased Workflows */}
         <h2 className="text-2xl font-black tracking-tighter mb-6">MY PURCHASES</h2>

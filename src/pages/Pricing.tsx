@@ -22,21 +22,15 @@ export const Pricing = () => {
     e.preventDefault();
     setCustomStatus("submitting");
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
-      const res = await fetch(`${supabaseUrl}/rest/v1/CustomBuildRequest`, {
-        method: 'POST',
-        headers: {
-          'apikey': anonKey,
-          'Authorization': `Bearer ${anonKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({ email: customEmail, details: customDetails })
+    const { error: submitError } = await supabase
+      .from('CustomBuildRequest')
+      .insert({ 
+        email: customEmail.toLowerCase().trim(), 
+        details: customDetails,
+        status: 'pending'
       });
       
-      if (!res.ok) throw new Error('Failed to submit custom build request');
+    if (submitError) throw submitError;
       
       setCustomStatus("success");
       setTimeout(() => {
