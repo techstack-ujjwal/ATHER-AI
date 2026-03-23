@@ -68,7 +68,7 @@ export const RunWorkflow = () => {
   const executeWorkflow = async (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('running');
-    setLogs("[System] Initializing execution environment...\n");
+    setLogs(["[System] Initializing execution environment..."]);
     setOutput(null);
 
     const sandboxUrl = import.meta.env.VITE_SANDBOX_URL;
@@ -76,7 +76,7 @@ export const RunWorkflow = () => {
     if (sandboxUrl) {
       // Real Backend Execution
       try {
-        setLogs(prev => prev + "[System] Connecting to secure Python sandbox...\n");
+        setLogs(prev => [...prev, "[System] Connecting to secure Python sandbox..."]);
         const executionId = crypto.randomUUID();
         
         // 1. Trigger the background execution
@@ -95,7 +95,7 @@ export const RunWorkflow = () => {
 
         if (!res.ok) throw new Error("Failed to connect to Sandbox Engine");
         
-        setLogs(prev => prev + "[System] Execution queued. Waiting for results...\n");
+        setLogs(prev => [...prev, "[System] Execution queued. Waiting for results..."]);
 
         // 2. Poll Supabase for the Execution record updates
         let attempts = 0;
@@ -108,7 +108,7 @@ export const RunWorkflow = () => {
             .single();
             
           if (data && data.logs) {
-            setLogs(data.logs); // Update with real streaming logs from DB
+            setLogs(typeof data.logs === 'string' ? data.logs.split('\n').filter(Boolean) : data.logs);
           }
 
           if (data && (data.status === 'success' || data.status === 'failed')) {
@@ -118,18 +118,18 @@ export const RunWorkflow = () => {
           } else if (attempts > 30) { // 60 seconds timeout (2s intervals)
             clearInterval(pollInterval);
             setStatus('error');
-            setLogs(prev => prev + "\n[Error] Execution timed out.");
+            setLogs(prev => [...prev, "[Error] Execution timed out."]);
           }
         }, 2000);
 
       } catch (err: any) {
         setStatus('error');
-        setLogs(prev => prev + `\n[Error] ${err.message}`);
+        setLogs(prev => [...prev, `[Error] ${err.message}`]);
       }
 
     } else {
       // Mock Execution Fallback
-      setLogs(prev => prev + "[System] Mock mode active (VITE_SANDBOX_URL not set).\n");
+      setLogs(prev => [...prev, "[System] Mock mode active (VITE_SANDBOX_URL not set)."]);
       const steps = [
         "[System] Validating inputs...",
         "[Process] Allocating memory...",
@@ -144,7 +144,7 @@ export const RunWorkflow = () => {
       let currentStep = 0;
       const interval = setInterval(() => {
         if (currentStep < steps.length) {
-          setLogs(prev => prev + steps[currentStep] + "\n");
+          setLogs(prev => [...prev, steps[currentStep]]);
           currentStep++;
         } else {
           clearInterval(interval);
@@ -173,7 +173,10 @@ export const RunWorkflow = () => {
     </div>
   );
 
-  const schema: ExecutionSchema = workflow.executionSchema || { inputs: [] };
+  const schema: ExecutionSchema = workflow.executionSchema?.inputs?.length > 0 
+    ? workflow.executionSchema 
+    : { inputs: [{ name: 'input_data', label: 'Input Data (Prompt, Text, or JSON)', type: 'longtext', required: true }] };
+
   const hasSchema = schema.inputs.length > 0;
 
   return (
@@ -188,10 +191,9 @@ export const RunWorkflow = () => {
         <div className="flex items-start justify-between gap-8 mb-12">
           <div>
             <h1 className="text-4xl md:text-5xl font-black mb-4 tracking-tighter">{workflow.title}</h1>
-            <p className="text-white/60 text-lg max-w-2xl">{workflow.description}</p>
           </div>
           {workflow.imageUrl && (
-            <img src={workflow.imageUrl} alt={workflow.title} className="w-24 h-24 rounded-2xl object-cover bg-white/5 shrink-0 border border-white/10" />
+             <img src={workflow.imageUrl} alt={workflow.title} className="w-24 h-24 rounded-2xl object-cover bg-white/5 shrink-0 border border-white/10" />
           )}
         </div>
 
@@ -283,10 +285,10 @@ export const RunWorkflow = () => {
                       key={i}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
-                      className={`${log.includes('System') ? 'text-blue-400' : 'text-emerald-400'}`}
+                      className={`${(log || '').includes('System') ? 'text-blue-400' : 'text-emerald-400'}`}
                     >
                       <span className="text-white/30 mr-2">{new Date().toISOString().split('T')[1].slice(0,-1)}</span>
-                      {log}
+                      {log || ''}
                     </motion.div>
                   ))
                 )}

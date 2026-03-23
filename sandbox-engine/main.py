@@ -131,6 +131,10 @@ async def trigger_run(request: ExecutionRequest, background_tasks: BackgroundTas
     
     return {"message": "Execution queued", "execution_id": request.execution_id, "status": "queued"}
 
+@app.get("/")
+def root():
+    return {"service": "Aether AI Sandbox Engine", "status": "online", "version": "1.0.0"}
+
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "sandbox_engine": "online"}
