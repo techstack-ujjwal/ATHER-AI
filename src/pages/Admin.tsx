@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { supabase } from '../lib/supabaseClient';
 import { useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ShoppingBag, MessageSquare, Layers, Trash2, RefreshCw, Upload, ExternalLink, DollarSign, Users, ShieldCheck, UserCog } from 'lucide-react';
+import { LayoutDashboard, ShoppingBag, MessageSquare, Layers, Trash2, RefreshCw, Upload, ExternalLink, DollarSign, Users, ShieldCheck, UserCog, Download } from 'lucide-react';
 import { useToast } from '../context/ToastContext';
 
 const ADMIN_EMAIL = 'ujjwalrajan2@gmail.com';
@@ -326,8 +326,12 @@ export const Admin = () => {
                       </div>
                       <p className="text-ink-muted text-sm leading-relaxed">{req.details}</p>
                       {req.responseFileUrl && (
-                        <a href={req.responseFileUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-green-600 hover:underline">
-                          <ExternalLink className="w-4 h-4" /> View uploaded response file
+                        <a 
+                          href={`${req.responseFileUrl}${req.responseFileUrl.includes('?') ? '&' : '?'}download=`} 
+                          download 
+                          className="mt-3 inline-flex items-center gap-2 text-sm font-bold text-green-600 hover:underline"
+                        >
+                          <Download className="w-4 h-4" /> Download response file
                         </a>
                       )}
                     </div>

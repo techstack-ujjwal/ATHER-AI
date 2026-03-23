@@ -125,7 +125,11 @@ export const WorkflowDetail = () => {
             <div className="space-y-3">
               {workflow.price === 0 || workflow.price === '0' ? (
                 <>
-                  <a href={workflow.fileUrl} download className="w-full bg-ink text-surface py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity">
+                  <a 
+                    href={`${workflow.fileUrl}${workflow.fileUrl.includes('?') ? '&' : '?'}download=`} 
+                    download 
+                    className="w-full bg-ink text-surface py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
+                  >
                     <Download className="w-5 h-5" /> Download Free
                   </a>
                   {workflow.liveUrl && (

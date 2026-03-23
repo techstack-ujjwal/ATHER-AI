@@ -241,7 +241,10 @@ export const Profile = () => {
                         {req.status}
                       </span>
                       {req.responseFileUrl && (
-                        <a href={req.responseFileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-ink text-white text-xs font-bold px-4 py-2 rounded-full hover:opacity-90 transition-opacity">
+                        <a 
+                          href={`${req.responseFileUrl}${req.responseFileUrl.includes('?') ? '&' : '?'}download=`} 
+                          className="flex items-center gap-2 bg-ink text-white text-xs font-bold px-4 py-2 rounded-full hover:opacity-90 transition-opacity"
+                        >
                           Download Workflow
                         </a>
                       )}
@@ -286,8 +289,14 @@ export const Profile = () => {
                       <p className="text-ink-muted text-xs truncate">{wf.description}</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-2 mt-auto pt-4 border-t border-black/5">
-                     <a href={wf.fileUrl} download className="text-center bg-ink text-surface py-2 rounded-xl text-xs font-bold hover:opacity-90 transition-opacity">Download File</a>
+                    <div className="grid grid-cols-2 gap-2 mt-auto pt-4 border-t border-black/5">
+                       <a 
+                         href={`${wf.fileUrl}${wf.fileUrl.includes('?') ? '&' : '?'}download=`} 
+                         download 
+                         className="text-center bg-ink text-surface py-2 rounded-xl text-xs font-bold hover:opacity-90 transition-opacity"
+                       >
+                         Download File
+                       </a>
                      <button onClick={() => navigate(`/workflow/${wf.id}`)} className="text-center bg-surface border border-ink/10 text-ink py-2 rounded-xl text-xs font-bold hover:bg-surface-container-highest transition-colors">View Details</button>
                      {wf.liveUrl && (
                         <a href={ensureAbsoluteUrl(wf.liveUrl)} target="_blank" rel="noopener noreferrer" className="col-span-2 text-center bg-blue-600 text-white py-2 rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2">
