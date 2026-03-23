@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { supabase } from './lib/supabaseClient';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
@@ -38,6 +39,22 @@ const PageWrapper = ({ children }: { children: React.ReactNode }) => {
 };
 
 export default function App() {
+  React.useEffect(() => {
+    // Listen for auth state changes (especially after Google OAuth redirect)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log("[App] Auth event:", event);
+      if (event === 'SIGNED_IN' && session) {
+        // Manually sync session to the key expected by Navbar
+        const localKey = 'sb-fvywzznegjfmlaqodfoj-auth-token';
+        localStorage.setItem(localKey, JSON.stringify(session));
+        // Force Navbar and other components to re-read localStorage
+        window.dispatchEvent(new Event('auth-updated'));
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   return (
     <ThemeProvider>
       <ToastProvider>

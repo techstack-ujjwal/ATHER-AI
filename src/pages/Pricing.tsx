@@ -151,16 +151,11 @@ export const Pricing = () => {
       console.log("[Pricing] Creating order on backend...");
       const amount = parseInt(tier.price.replace('$', ''));
       
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-
       const orderResponse = await fetch(`${apiUrl}/api/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount, currency: 'USD' }),
-        signal: controller.signal
+        body: JSON.stringify({ amount, currency: 'USD' })
       });
-      clearTimeout(timeoutId);
       
       console.log("[Pricing] Order response received:", orderResponse.status);
       if (!orderResponse.ok) {
