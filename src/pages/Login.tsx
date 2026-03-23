@@ -33,6 +33,11 @@ export const Login = () => {
             throw signInError;
         }
       } else if (data.session) {
+        // Manually persist to the key our Navbar reads from localStorage
+        const localKey = 'sb-fvywzznegjfmlaqodfoj-auth-token';
+        localStorage.setItem(localKey, JSON.stringify(data.session));
+        // Fire auth-updated so Navbar instantly re-reads the session
+        window.dispatchEvent(new Event('auth-updated'));
         navigate('/');
       }
     } catch (err: any) {

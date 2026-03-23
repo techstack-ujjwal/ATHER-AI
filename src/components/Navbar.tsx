@@ -21,6 +21,16 @@ export const Navbar = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    localStorage.removeItem('sb-fvywzznegjfmlaqodfoj-auth-token');
+    localStorage.removeItem('aether_cart');
+    setUser(null);
+    setCartCount(0);
+    window.dispatchEvent(new Event('cart-updated'));
+    navigate('/login');
+  };
+
   const refreshCartCount = () => {
     const stored = localStorage.getItem('aether_cart');
     setCartCount(stored ? JSON.parse(stored).length : 0);
@@ -190,7 +200,7 @@ export const Navbar = () => {
                       </Link>
                     )}
                     <button 
-                      onClick={() => supabase.auth.signOut()}
+                      onClick={handleSignOut}
                       className="w-full flex items-center gap-3 p-2 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-sm font-bold transition-colors"
                     >
                       <LogOut className="w-4 h-4" /> Sign Out
@@ -258,7 +268,7 @@ export const Navbar = () => {
                   <User className="w-4 h-4" /> My Profile
                 </Link>
                 <button 
-                  onClick={() => { supabase.auth.signOut(); setIsOpen(false); }}
+                  onClick={() => { handleSignOut(); setIsOpen(false); }}
                   className="bg-surface border border-black/10 text-ink px-6 py-3 rounded-full text-sm font-semibold w-full text-center flex items-center justify-center gap-2"
                 >
                   <LogOut className="w-4 h-4" /> Sign Out

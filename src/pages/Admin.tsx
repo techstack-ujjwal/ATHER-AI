@@ -104,13 +104,18 @@ export const Admin = () => {
       const uploadRes = await fetch(`${supabaseUrl}/storage/v1/object/workflows/${path}`, {
         method: 'POST',
         headers: {
+          'apikey': anonKey,
           'Authorization': `Bearer ${token}`,
-          'Content-Type': file.type || 'application/octet-stream'
+          'Content-Type': file.type || 'application/octet-stream',
+          'x-upsert': 'true'
         },
         body: file
       });
       
-      if (!uploadRes.ok) throw new Error('Upload failed');
+      if (!uploadRes.ok) {
+        const errBody = await uploadRes.json().catch(() => ({ message: uploadRes.statusText }));
+        throw new Error(errBody.message || errBody.error || 'Storage upload failed');
+      }
       
       // We manually construct the public URL from the project ID
       const publicUrl = `${supabaseUrl}/storage/v1/object/public/workflows/${path}`;

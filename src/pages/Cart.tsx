@@ -72,16 +72,12 @@ export const Cart = () => {
       }
 
       console.log("[Cart] Creating order on backend...");
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
       const orderResponse = await fetch(`${apiUrl}/api/create-order`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ amount: total, currency: 'USD' }),
-        signal: controller.signal
+        body: JSON.stringify({ amount: total, currency: 'USD' })
       });
-      clearTimeout(timeoutId);
       
       console.log("[Cart] Order response received:", orderResponse.status);
 

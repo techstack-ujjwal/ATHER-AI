@@ -9,6 +9,8 @@ export const Profile = () => {
   const [user, setUser] = useState<any>(null);
   const [publishedWorkflows, setPublishedWorkflows] = useState<any[]>([]);
   const [purchasedWorkflows, setPurchasedWorkflows] = useState<any[]>([]);
+  const [sales, setSales] = useState<any[]>([]);
+  const [myRequests, setMyRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingWorkflow, setEditingWorkflow] = useState<any>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -47,6 +49,22 @@ export const Profile = () => {
         const purRes = await fetch(`${supabaseUrl}/rest/v1/Purchase?userId=eq.${session.user.id}&select=*,workflow:Workflow(*)`, { headers });
         const purData = await purRes.json().catch(() => []);
         setPurchasedWorkflows((purData || []).map((p: any) => p.workflow).filter(Boolean));
+
+        // Fetch My Sales — fetch all my published workflows' IDs first, then find purchases for them
+        if (pubData && pubData.length > 0) {
+          const myWorkflowIds = pubData.map((w: any) => w.id);
+          const salesRes = await fetch(
+            `${supabaseUrl}/rest/v1/Purchase?workflowId=in.(${myWorkflowIds.join(',')})&select=*,workflow:Workflow(title)&order=createdAt.desc`,
+            { headers }
+          );
+          const salesData = await salesRes.json().catch(() => []);
+          setSales((salesData || []).map((s: any) => ({ ...s, workflow: Array.isArray(s.workflow) ? s.workflow[0] : s.workflow })));
+        }
+
+        // Fetch My Custom Build Requests
+        const reqRes = await fetch(`${supabaseUrl}/rest/v1/CustomBuildRequest?email=eq.${encodeURIComponent(session.user.email)}&order=createdAt.desc&select=*`, { headers });
+        const reqData = await reqRes.json().catch(() => []);
+        setMyRequests(reqData || []);
 
       } catch (err) {
         console.error("Profile fetch error:", err);
@@ -153,8 +171,68 @@ export const Profile = () => {
               <p className="text-4xl font-black">{publishedWorkflows.length}</p>
               <p className="text-xs text-ink-muted font-bold uppercase tracking-widest">Published</p>
             </div>
+             <div>
+              <p className="text-4xl font-black text-emerald-600">${sales.reduce((sum, s) => sum + Number(s.amount || 0), 0).toFixed(2)}</p>
+              <p className="text-xs text-emerald-600/60 font-bold uppercase tracking-widest">Earned</p>
+            </div>
           </div>
         </motion.div>
+
+        {/* Sales History */}
+        {sales.length > 0 && (
+          <div className="mb-16">
+            <h2 className="text-2xl font-black tracking-tighter mb-6">MY EARNINGS</h2>
+            <div className="bg-white rounded-3xl p-8 border border-black/5 shadow-sm">
+              <table className="w-full text-sm text-left">
+                <thead className="border-b border-black/5">
+                  <tr>
+                    <th className="pb-4 font-bold text-ink-muted text-xs uppercase tracking-widest">Workflow Sold</th>
+                    <th className="pb-4 font-bold text-ink-muted text-xs uppercase tracking-widest">Date</th>
+                    <th className="pb-4 text-right font-bold text-ink-muted text-xs uppercase tracking-widest">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/5">
+                  {sales.map(sale => (
+                    <tr key={sale.id}>
+                      <td className="py-4 font-bold">{sale.workflow?.title || 'Unknown'}</td>
+                      <td className="py-4 text-ink-muted">{new Date(sale.createdAt).toLocaleDateString()}</td>
+                      <td className="py-4 text-right font-black text-emerald-600">+${sale.amount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* My Custom Requests */}
+        {myRequests.length > 0 && (
+          <div className="mb-16">
+            <h2 className="text-2xl font-black tracking-tighter mb-6">MY CUSTOM REQUESTS</h2>
+            <div className="space-y-4">
+              {myRequests.map((req: any, i: number) => (
+                <motion.div key={req.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }} className="bg-white rounded-2xl border border-black/5 p-6 shadow-sm">
+                  <div className="flex items-start justify-between gap-4 flex-wrap">
+                    <div className="flex-grow min-w-0">
+                      <p className="font-bold text-sm mb-1 text-ink line-clamp-2">{req.details}</p>
+                      <p className="text-xs text-ink-muted">{new Date(req.createdAt).toLocaleDateString()}</p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className={`text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider border ${req.status === 'pending' ? 'bg-amber-50 border-amber-200 text-amber-700' : req.status === 'completed' ? 'bg-green-50 border-green-200 text-green-700' : 'bg-blue-50 border-blue-200 text-blue-700'}`}>
+                        {req.status}
+                      </span>
+                      {req.responseFileUrl && (
+                        <a href={req.responseFileUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-ink text-white text-xs font-bold px-4 py-2 rounded-full hover:opacity-90 transition-opacity">
+                          Download Workflow
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Purchased Workflows */}
         <h2 className="text-2xl font-black tracking-tighter mb-6">MY PURCHASES</h2>
