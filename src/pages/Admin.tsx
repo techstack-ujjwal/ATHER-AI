@@ -145,6 +145,21 @@ export const Admin = () => {
     setUploadingFor(null);
   };
 
+  const deleteCustomRequest = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this custom build request?')) return;
+    const { token, supabaseUrl, anonKey } = getAuthArgs();
+    const res = await fetch(`${supabaseUrl}/rest/v1/CustomBuildRequest?id=eq.${id}`, {
+      method: 'DELETE',
+      headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}` }
+    });
+    if (res.ok) {
+      setRequests(prev => prev.filter(r => r.id !== id));
+      showToast('Request deleted', 'success');
+    } else {
+      showToast('Failed to delete request', 'error');
+    }
+  };
+
   const updateUserPlan = async (userId: string, plan: string) => {
      const { token, supabaseUrl, anonKey } = getAuthArgs();
      const res = await fetch(`${supabaseUrl}/rest/v1/User?id=eq.${userId}`, {
@@ -335,12 +350,15 @@ export const Admin = () => {
                         </a>
                       )}
                     </div>
-                    <div className="shrink-0">
+                    <div className="shrink-0 flex items-center gap-2">
                       <label className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold cursor-pointer transition-all ${uploadingFor === req.id ? 'bg-ink/10 text-ink-muted' : 'bg-ink text-white hover:opacity-90'}`}>
                         <input type="file" className="hidden" disabled={uploadingFor === req.id} onChange={e => { if (e.target.files?.[0]) handleUploadResponse(req.id, e.target.files[0]); }} />
                         <Upload className="w-4 h-4" />
                         {uploadingFor === req.id ? 'Uploading...' : 'Upload Workflow Response'}
                       </label>
+                      <button onClick={() => deleteCustomRequest(req.id)} className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors flex items-center justify-center shrink-0">
+                        <Trash2 className="w-5 h-5" />
+                      </button>
                     </div>
                   </div>
                 </div>
