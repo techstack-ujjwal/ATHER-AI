@@ -35,36 +35,47 @@ export const Profile = () => {
         const session = JSON.parse(localData);
         setUser(session.user);
         
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-        const token = session.access_token;
-        const headers = { 'apikey': anonKey, 'Authorization': `Bearer ${token}` };
-
         // Fetch Published Workflows
-        const pubRes = await fetch(`${supabaseUrl}/rest/v1/Workflow?sellerId=eq.${session.user.id}&order=createdAt.desc&select=*`, { headers });
-        const pubData = await pubRes.json().catch(() => []);
+        const { data: pubData } = await supabase
+          .from('Workflow')
+          .select('*')
+          .eq('sellerId', session.user.id)
+          .order('createdAt', { ascending: false });
+        
         setPublishedWorkflows(pubData || []);
 
-        // Fetch Purchased Workflows
-        const purRes = await fetch(`${supabaseUrl}/rest/v1/Purchase?userId=eq.${session.user.id}&select=*,workflow:Workflow(*)`, { headers });
-        const purData = await purRes.json().catch(() => []);
-        setPurchasedWorkflows((purData || []).map((p: any) => p.workflow).filter(Boolean));
-
-        // Fetch My Sales — fetch all my published workflows' IDs first, then find purchases for them
-        if (pubData && pubData.length > 0) {
-          const myWorkflowIds = pubData.map((w: any) => w.id);
-          const salesRes = await fetch(
-            `${supabaseUrl}/rest/v1/Purchase?workflowId=in.(${myWorkflowIds.join(',')})&select=*,workflow:Workflow(title)&order=createdAt.desc`,
-            { headers }
-          );
-          const salesData = await salesRes.json().catch(() => []);
-          setSales((salesData || []).map((s: any) => ({ ...s, workflow: Array.isArray(s.workflow) ? s.workflow[0] : s.workflow })));
+        // Fetch Purchased Workflows - Defensive check to prevent .map crashes
+        const { data: purData } = await supabase
+          .from('Purchase')
+          .select('*, workflow:Workflow(*)')
+          .eq('userId', session.user.id);
+        
+        if (Array.isArray(purData)) {
+          setPurchasedWorkflows(purData.map((p: any) => p.workflow).filter(Boolean));
         }
 
-        // Fetch My Custom Build Requests - Using case-insensitive ilike for email
-        const userEmail = session.user.email?.toLowerCase();
-        const reqRes = await fetch(`${supabaseUrl}/rest/v1/CustomBuildRequest?email=ilike.${encodeURIComponent(userEmail)}&order=createdAt.desc&select=*`, { headers });
-        const reqData = await reqRes.json().catch(() => []);
+        // Fetch My Sales
+        if (Array.isArray(pubData) && pubData.length > 0) {
+          const myWorkflowIds = pubData.map((w: any) => w.id);
+          const { data: salesData } = await supabase
+            .from('Purchase')
+            .select('*, workflow:Workflow(title)')
+            .in('workflowId', myWorkflowIds)
+            .order('createdAt', { ascending: false });
+          
+          if (Array.isArray(salesData)) {
+            setSales(salesData.map((s: any) => ({ ...s, workflow: Array.isArray(s.workflow) ? s.workflow[0] : s.workflow })));
+          }
+        }
+
+        // Fetch My Custom Build Requests - Robust email matching
+        const userEmail = session.user.email?.toLowerCase().trim();
+        const { data: reqData } = await supabase
+          .from('CustomBuildRequest')
+          .select('*')
+          .ilike('email', userEmail)
+          .order('createdAt', { ascending: false });
+        
         setMyRequests(reqData || []);
 
       } catch (err) {

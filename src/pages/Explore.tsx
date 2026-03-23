@@ -25,24 +25,20 @@ export const Explore = () => {
     async function fetchWorkflows() {
       setLoading(true);
       try {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-        let queryStr = `${supabaseUrl}/rest/v1/Workflow?select=*&order=createdAt.desc`;
+        let query = supabase
+          .from('Workflow')
+          .select('*')
+          .order('createdAt', { ascending: false });
         
         if (activeCategory !== "All") {
-          queryStr += `&category=eq.${encodeURIComponent(activeCategory)}`;
+          query = query.eq('category', activeCategory);
         }
         if (searchQuery) {
-          queryStr += `&title=ilike.*${encodeURIComponent(searchQuery)}*`;
+          query = query.ilike('title', `%${searchQuery}%`);
         }
 
-        const res = await fetch(queryStr, {
-          headers: { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` }
-        });
-        
-        if (!res.ok) throw new Error('Failed to fetch workflows');
-        const data = await res.json();
+        const { data, error } = await query;
+        if (error) throw error;
         
         const mappedData = (data || []).map((w: any) => ({
           ...w,
@@ -52,28 +48,20 @@ export const Explore = () => {
 
         setWorkflows(mappedData);
 
-        try {
-          const localSessionStr = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
-          if (localSessionStr) {
-            const sessionData = JSON.parse(localSessionStr);
-            const token = sessionData.access_token;
-            const userId = sessionData.user.id;
-            const fallbackPlan = sessionData.user.user_metadata?.plan || 'Free';
+        // Fetch User Plan if logged in
+        const localSessionStr = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
+        if (localSessionStr) {
+          const sessionData = JSON.parse(localSessionStr);
+          const userId = sessionData.user.id;
+          const fallbackPlan = sessionData.user.user_metadata?.plan || 'Free';
+          
+          const { data: userData } = await supabase
+            .from('User')
+            .select('plan')
+            .eq('id', userId)
+            .single();
             
-            const userRes = await fetch(`${supabaseUrl}/rest/v1/User?id=eq.${userId}&select=plan`, {
-              headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}` }
-            });
-            if (userRes.ok) {
-              const userData = await userRes.json();
-              if (userData && userData.length > 0) {
-                setUserPlan(userData[0].plan || fallbackPlan);
-              } else {
-                setUserPlan(fallbackPlan);
-              }
-            }
-          }
-        } catch (authErr) {
-          console.warn('Could not parse local auth state', authErr);
+          setUserPlan(userData?.plan || fallbackPlan);
         }
       } catch (err) {
         console.error("Failed to load workflows:", err);

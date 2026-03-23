@@ -23,25 +23,26 @@ export const WorkflowDetail = () => {
       setCurrentUser(JSON.parse(localSessionStr).user);
     }
 
-    if (id) {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-      
-      fetch(`${supabaseUrl}/rest/v1/Workflow?id=eq.${id}&select=*`, {
-        headers: { 'apikey': anonKey, 'Authorization': `Bearer ${anonKey}` }
-      })
-      .then(res => res.json())
-      .then(data => {
-        if (data && data.length > 0) {
-          setWorkflow(data[0]);
-        }
+    async function fetchWorkflow() {
+      if (!id) return;
+      setLoading(true);
+      try {
+        const { data, error } = await supabase
+          .from('Workflow')
+          .select('*')
+          .eq('id', id)
+          .single();
+        
+        if (error) throw error;
+        setWorkflow(data);
+      } catch (err) {
+        console.error("Failed to load workflow:", err);
+      } finally {
         setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
+      }
     }
+
+    fetchWorkflow();
   }, [id]);
 
   const addToCart = () => {
@@ -59,18 +60,18 @@ export const WorkflowDetail = () => {
 
   const deleteWorkflow = async () => {
     if (!confirm('Delete this workflow permanently?')) return;
-    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-    const localSessionStr = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
-    
-    if (localSessionStr) {
-      const token = JSON.parse(localSessionStr).access_token;
-      await fetch(`${supabaseUrl}/rest/v1/Workflow?id=eq.${workflow.id}`, {
-        method: 'DELETE',
-        headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}` }
-      });
+    try {
+      const { error } = await supabase
+        .from('Workflow')
+        .delete()
+        .eq('id', workflow.id);
+      
+      if (error) throw error;
+      navigate('/explore');
+    } catch (err) {
+      console.error("Failed to delete workflow:", err);
+      alert("Failed to delete workflow. Are you the owner?");
     }
-    navigate('/explore');
   };
 
   const isOwner = currentUser && workflow && currentUser.id === workflow.sellerId;
