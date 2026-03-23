@@ -120,19 +120,25 @@ export const Admin = () => {
       // We manually construct the public URL from the project ID
       const publicUrl = `${supabaseUrl}/storage/v1/object/public/workflows/${path}`;
       
-      const patchRes = await fetch(`${supabaseUrl}/rest/v1/CustomBuildRequest?id=eq.${requestId}`, {
-        method: 'PATCH',
-        headers: { 'apikey': anonKey, 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'Prefer': 'return=representation' },
-        body: JSON.stringify({ responseFileUrl: publicUrl, status: 'completed' })
-      });
-      
-      const patchData = await patchRes.json().catch(() => null);
-      if (!patchRes.ok || !patchData || patchData.length === 0) {
-         throw new Error('Database update failed (Row not found or permission denied by RLS). File was uploaded to storage, but could not link it.');
+      // Link to Database - Using supabase client for better error handling and RLS bypass if configured
+      const { data: patchData, error: patchError } = await supabase
+        .from('CustomBuildRequest')
+        .update({ responseFileUrl: publicUrl, status: 'completed' })
+        .eq('id', requestId)
+        .select();
+
+      if (patchError) {
+        console.error("Supabase Patch Error:", patchError);
+        throw new Error(`Database error: ${patchError.message} (${patchError.code})`);
+      }
+
+      if (!patchData || patchData.length === 0) {
+        console.error("Database row not found or RLS-blocked for ID:", requestId);
+        throw new Error('Database link failed: Request not found or permission denied by RLS.');
       }
 
       setRequests(prev => prev.map(r => r.id === requestId ? { ...r, responseFileUrl: publicUrl, status: 'completed' } : r));
-      showToast('File uploaded successfully! Mark as completed.', 'success');
+      showToast('Build completed and file linked!', 'success');
     } catch (err: any) {
       showToast('Upload failed: ' + err.message, 'error');
     }
