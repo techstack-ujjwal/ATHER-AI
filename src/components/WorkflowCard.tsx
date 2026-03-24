@@ -24,7 +24,6 @@ export const WorkflowCard = ({ id, title, category, price, rating, sales, image,
 
   const addToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isLocked) return;
     const stored = localStorage.getItem('aether_cart');
     const cart = stored ? JSON.parse(stored) : [];
     if (!cart.find((item: any) => item.id === id)) {
@@ -37,10 +36,8 @@ export const WorkflowCard = ({ id, title, category, price, rating, sales, image,
   };
 
   const handleCardClick = () => {
-    if (id && !isLocked) {
+    if (id) {
       navigate(`/workflow/${id}`);
-    } else if (isLocked) {
-      navigate('/pricing');
     }
   };
 
@@ -121,7 +118,7 @@ export const WorkflowCard = ({ id, title, category, price, rating, sales, image,
           )}
           <div className="ml-auto flex items-center gap-2">
             <span className={`text-lg font-black ${isFree ? 'text-emerald-600' : ''}`}>{displayPrice}</span>
-            {!isLocked && !isFree && (
+            {!isFree && (
               <motion.button
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}

@@ -26,7 +26,7 @@ export const Home = () => {
           'Content-Type': 'application/json',
           'Prefer': 'return=minimal'
         },
-        body: JSON.stringify({ email: customEmail, details: customDetails })
+        body: JSON.stringify({ email: customEmail.toLowerCase().trim(), details: customDetails })
       });
       
       if (!res.ok) throw new Error('Failed to submit custom build request');
@@ -171,7 +171,6 @@ export const Home = () => {
                   complexity={wf.complexity}
                   imageUrl={wf.imageUrl}
                   description={wf.description}
-                  isLocked={(Number(wf.price) || 0) > 0 && !userPlan}
                 />
               ))
             )}

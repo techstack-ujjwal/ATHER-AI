@@ -11,7 +11,7 @@ export const WorkflowDetail = () => {
   const [loading, setLoading] = useState(true);
   const [added, setAdded] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [currentUserPlan, setCurrentUserPlan] = useState<string>('Free');
+  const [hasPurchased, setHasPurchased] = useState(false);
 
   const ensureAbsoluteUrl = (url: string) => {
     if (!url) return '#';
@@ -21,11 +21,7 @@ export const WorkflowDetail = () => {
   useEffect(() => {
     const localSessionStr = localStorage.getItem('sb-fvywzznegjfmlaqodfoj-auth-token');
     if (localSessionStr) {
-      const parsed = JSON.parse(localSessionStr);
-      setCurrentUser(parsed.user);
-      if (parsed.user?.user_metadata?.plan) {
-         setCurrentUserPlan(parsed.user.user_metadata.plan);
-      }
+      setCurrentUser(JSON.parse(localSessionStr).user);
     }
 
     async function fetchWorkflow() {
@@ -49,6 +45,29 @@ export const WorkflowDetail = () => {
 
     fetchWorkflow();
   }, [id]);
+
+  useEffect(() => {
+    async function checkPurchase() {
+      if (!currentUser || !workflow) return;
+      if (workflow.price === 0 || workflow.price === '0') return;
+      if (currentUser.id === workflow.sellerId || currentUser.email === 'ujjwalrajan2@gmail.com') return;
+      
+      try {
+        const { data } = await supabase
+          .from('Purchase')
+          .select('id')
+          .eq('userId', currentUser.id)
+          .eq('workflowId', workflow.id);
+          
+        if (data && data.length > 0) {
+          setHasPurchased(true);
+        }
+      } catch (err) {
+        console.error("Failed to check purchase status", err);
+      }
+    }
+    checkPurchase();
+  }, [currentUser, workflow]);
 
   const addToCart = () => {
     if (!workflow) return;
@@ -79,8 +98,6 @@ export const WorkflowDetail = () => {
     }
   };
 
-  const isOwner = currentUser && workflow && currentUser.id === workflow.sellerId;
-
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="w-10 h-10 border-4 border-ink/20 border-t-ink rounded-full animate-spin" />
@@ -96,12 +113,11 @@ export const WorkflowDetail = () => {
     </div>
   );
 
-  const complexityColor = workflow.complexity === 'Low' ? 'text-emerald-600 bg-emerald-50' : workflow.complexity === 'Medium' ? 'text-amber-600 bg-amber-50' : 'text-rose-600 bg-rose-50';
+  const isAdmin = currentUser && currentUser.email === 'ujjwalrajan2@gmail.com';
+  const isOwner = currentUser && workflow && currentUser.id === workflow.sellerId;
+  const hasAccess = Boolean(isOwner || isAdmin || hasPurchased || workflow.price === 0 || workflow.price === '0');
 
-  const isAdmin = currentUser?.email === 'ujjwalrajan2@gmail.com';
-  const hasPremiumAccess = currentUserPlan === 'Pro' || currentUserPlan === 'Architect' || currentUserPlan === 'Enterprise' || isAdmin;
-  const isFree = workflow.price === 0 || workflow.price === '0';
-  const canAccess = isFree || hasPremiumAccess || isOwner;
+  const complexityColor = workflow.complexity === 'Low' ? 'text-emerald-600 bg-emerald-50' : workflow.complexity === 'Medium' ? 'text-amber-600 bg-amber-50' : 'text-rose-600 bg-rose-50';
 
   return (
     <div className="pt-20 min-h-screen bg-surface">
@@ -133,20 +149,14 @@ export const WorkflowDetail = () => {
 
             {/* Action buttons */}
             <div className="space-y-3">
-              {canAccess ? (
+              {hasAccess ? (
                 <>
-                  <button 
-                    onClick={() => navigate(`/run/${workflow.id}`)}
-                    className="w-full bg-[#E5FF00] text-black py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-[#CCFF00] transition-colors shadow-lg shadow-[#E5FF00]/20"
-                  >
-                    <Zap className="w-5 h-5" /> Run Workflow
-                  </button>
                   <a 
                     href={`${workflow.fileUrl}${workflow.fileUrl.includes('?') ? '&' : '?'}download=`} 
                     download 
                     className="w-full bg-ink text-surface py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-opacity"
                   >
-                    <Download className="w-5 h-5" /> Download {hasPremiumAccess && !isFree ? '(Pro)' : 'Free'}
+                    <Download className="w-5 h-5" /> Download Workflow
                   </a>
                   {workflow.liveUrl && (
                     <a href={ensureAbsoluteUrl(workflow.liveUrl)} target="_blank" rel="noopener noreferrer" className="w-full bg-blue-600 text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20">

@@ -161,7 +161,6 @@ export const Explore = () => {
             ) : (
               workflows.slice(0, visibleCount).map((workflow, i) => {
                 const numericPrice = Number(workflow.price) || 0;
-                const isLocked = numericPrice > 0 && (!userPlan || userPlan === 'Free' || userPlan === 'Basis');
                 return (
                   <WorkflowCard 
                     key={workflow.id || i}
@@ -172,7 +171,6 @@ export const Explore = () => {
                     complexity={workflow.complexity}
                     price={numericPrice}
                     imageUrl={workflow.imageUrl}
-                    isLocked={isLocked}
                   />
                 );
               })
